@@ -41,7 +41,7 @@ public class MicrobiomeContext {
 			System.exit(-1);
 		}
 	}
-	
+
 	public Thread getProcess() {
 		return new Thread(queue);
 	}
@@ -101,6 +101,24 @@ public class MicrobiomeContext {
 			System.exit(-1);
 		}
 
+		// Help
+		if (set.has(help))
+			try {
+				System.out
+						.println("Usage: java -jar o2tab.jar --in <folder> <options>");
+				System.out
+						.println("--------------------------------------------------------------------");
+				parser.printHelpOn(System.out);
+				System.out
+						.println("--------------------------------------------------------------------");
+				System.out
+						.println("Developed by: Giovanni Bacci - giovanni.bacci@unifi.it");
+			} catch (IOException e) {
+				System.err.println("Cannot write help");
+			} finally {
+				System.exit(-1);
+			}
+
 		// Retriving params
 
 		// Adjusting inputs
@@ -149,9 +167,9 @@ public class MicrobiomeContext {
 		int threadNum = (set.has(thread)) ? set.valueOf(thread) : 1;
 		boolean assembly = false;
 		if (set.has(mate)) {
-			for(String s : set.valuesOf(mate))
+			for (String s : set.valuesOf(mate))
 				System.out.println(s);
-				
+
 			String mate1 = set.valuesOf(mate).get(0);
 			String mate2 = set.valuesOf(mate).get(1);
 			QualityEncoding enc = (set.has(enc64)) ? QualityEncoding.PHRED64
