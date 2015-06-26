@@ -53,11 +53,13 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 				Thread.sleep(200);
 			}
 		} catch (InterruptedException e) {
-			System.out.println("Process interrupted");
+			System.out.println("process interrupted");
 			t.interrupt();
 		}
-		if (ex != null)
+		if (ex != null) {
+			System.out.println("process exited with error/s");
 			throw ex;
+		}
 		if (res == PipelineResult.PASSED) {
 			System.out.println("process finished correctly");
 		} else {

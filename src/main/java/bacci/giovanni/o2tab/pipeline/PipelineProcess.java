@@ -41,8 +41,15 @@ public abstract class PipelineProcess {
 	protected PipelineProcess(ProcessType processType) {
 		this.processType = processType;
 		this.outputFiles = new ArrayList<String>();
-		this.outputDir = Paths.get(System.getProperty("user.dir"))
-				.resolve("output").toString();
+		this.outputDir = PipelineProcess.getDefaultOutput();
+	}
+
+	/**
+	 * @return the default output path for all processes
+	 */
+	public static String getDefaultOutput() {
+		return Paths.get(System.getProperty("user.dir")).resolve("output")
+				.toString();
 	}
 
 	/**
@@ -126,7 +133,6 @@ public abstract class PipelineProcess {
 	 */
 	public abstract PipelineResult launch() throws Exception;
 
-
 	/**
 	 * Pipeline result tokens
 	 * 
@@ -137,7 +143,5 @@ public abstract class PipelineProcess {
 	public enum PipelineResult {
 		FAILED, PASSED;
 	}
-
-
 
 }

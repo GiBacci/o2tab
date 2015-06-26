@@ -26,26 +26,57 @@ import bacci.giovanni.o2tab.process.PANDAseqProcessBuilder.QualityEncoding;
 import bacci.giovanni.o2tab.process.PoolingProcess;
 import bacci.giovanni.o2tab.process.TableProcess;
 
+/**
+ * Context class for microbiome pipeline
+ * 
+ * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
+ *         Bacci</a>
+ *
+ */
 public class MicrobiomeContext {
 
+	/**
+	 * The pipeline
+	 */
 	private PipelineProcessQueue queue;
 
+	/**
+	 * The error logger
+	 */
 	private Logger log = Logger.getLogger(this.getClass().getName());
 
+	/**
+	 * constructor
+	 * 
+	 * @param args
+	 *            program arguments
+	 */
 	public MicrobiomeContext(String[] args) {
 		this.queue = new MandatoryPipeline(log);
 		try {
 			this.parseArgs(args);
 		} catch (IOException e1) {
-			queue.log(Level.SEVERE, "I/O error occurs");
+			String msg = String.format("I/O error occurs%n message: %s", e1.getMessage());
+			queue.log(Level.SEVERE, msg);
 			System.exit(-1);
 		}
 	}
 
+	/**
+	 * @return a Thread with the pipeline
+	 */
 	public Thread getProcess() {
 		return new Thread(queue);
 	}
 
+	/**
+	 * Private method for parsing arguments and configuring the pipeline
+	 * 
+	 * @param args
+	 *            the arguments
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 */
 	private void parseArgs(String[] args) throws IOException {
 		OptionParser parser = new OptionParser();
 
@@ -103,21 +134,7 @@ public class MicrobiomeContext {
 
 		// Help
 		if (set.has(help))
-			try {
-				System.out
-						.println("Usage: java -jar o2tab.jar --in <folder> <options>");
-				System.out
-						.println("--------------------------------------------------------------------");
-				parser.printHelpOn(System.out);
-				System.out
-						.println("--------------------------------------------------------------------");
-				System.out
-						.println("Developed by: Giovanni Bacci - giovanni.bacci@unifi.it");
-			} catch (IOException e) {
-				System.err.println("Cannot write help");
-			} finally {
-				System.exit(-1);
-			}
+			this.printHelpAndExit(parser);
 
 		// Retriving params
 
@@ -167,9 +184,6 @@ public class MicrobiomeContext {
 		int threadNum = (set.has(thread)) ? set.valueOf(thread) : 1;
 		boolean assembly = false;
 		if (set.has(mate)) {
-			for (String s : set.valuesOf(mate))
-				System.out.println(s);
-
 			String mate1 = set.valuesOf(mate).get(0);
 			String mate2 = set.valuesOf(mate).get(1);
 			QualityEncoding enc = (set.has(enc64)) ? QualityEncoding.PHRED64
@@ -196,5 +210,30 @@ public class MicrobiomeContext {
 		queue.addPipelineProcess(new ClusteringOTU());
 		queue.addPipelineProcess(new MappingProcess());
 		queue.addPipelineProcess(new TableProcess());
+	}
+
+	/**
+	 * Prints help and exit the program
+	 * 
+	 * @param parser
+	 *            the argument parser
+	 */
+	private void printHelpAndExit(OptionParser parser) {
+		try {
+			System.out
+					.println("Usage: java -jar o2tab.jar --in <folder> <options>");
+			System.out
+					.println("--------------------------------------------------------------------");
+			parser.printHelpOn(System.out);
+			System.out
+					.println("--------------------------------------------------------------------");
+			System.out
+					.println("Developed by: Giovanni Bacci - giovanni.bacci[AT]unifi.it");
+		} catch (IOException e) {
+			System.err.println("Cannot write help");
+			System.exit(-1);
+		} finally {
+			System.exit(0);
+		}
 	}
 }

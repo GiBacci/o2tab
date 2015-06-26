@@ -79,6 +79,9 @@ public class ConfigFileReader<T extends CallableProcess> {
 		BufferedReader reader = new BufferedReader(new InputStreamReader(in));
 		String line = null;
 		while ((line = reader.readLine()) != null) {
+			String[] arr = line.split(COMMENT);
+			if(arr.length == 0)
+				continue;
 			String filterLine = line.split(COMMENT)[0];
 			if (filterLine.isEmpty())
 				continue;
