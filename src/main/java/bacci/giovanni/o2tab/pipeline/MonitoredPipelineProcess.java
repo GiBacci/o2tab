@@ -18,7 +18,7 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 
 	private Exception ex;
 
-	private final static String[] WAIT = { ".", "..", "..." };
+	private final static String[] WAIT = { "   ", ".  ", ".. ", "..." };
 
 	/**
 	 * Constructor
@@ -47,33 +47,39 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 		int index = 0;
 		try {
 			while (t.isAlive()) {
-				System.out.print(formatMsg(WAIT[index++]));
+				System.out.print(formatMsg(WAIT[index++], true));
 				if (index == WAIT.length)
 					index = 0;
 				Thread.sleep(200);
 			}
+			System.out.print(formatMsg(WAIT[WAIT.length - 1], false));
 		} catch (InterruptedException e) {
-			System.out.println("process interrupted");
+			System.out.println(" process interrupted");
 			t.interrupt();
 		}
 		if (ex != null) {
-			System.out.println("process exited with error/s");
+			System.out.println(" process exited with error/s");
 			throw ex;
 		}
 		if (res == PipelineResult.PASSED) {
-			System.out.println("process finished correctly");
+			System.out.println(" process finished correctly");
 		} else {
-			String msg = String
-					.format("process finished with error/s.%n    Check log file in: %s%n",
-							process.getOutputDir());
+			String msg = String.format(
+					" process fail.%n    Check log file in: %s%n",
+					process.getOutputDir());
 			System.out.println(msg);
 		}
 		return res;
 	}
 
-	private String formatMsg(String wait) {
-		return String.format("%s process started %s\r",
-				this.process.getProcessType(), wait);
+	private String formatMsg(String wait, boolean carriage) {
+		if (carriage) {
+			return String.format("%s process started %s\r",
+					this.process.getProcessType(), wait);
+		} else {
+			return String.format("%s process started %s",
+					this.process.getProcessType(), wait);
+		}
 	}
 
 }

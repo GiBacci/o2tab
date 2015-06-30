@@ -1,9 +1,15 @@
 package bacci.giovanni.o2tab.process;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 
 import bacci.giovanni.o2tab.exceptions.BadConfigFileFormatException;
 
@@ -38,9 +44,9 @@ public class ConfigFileReader<T extends CallableProcess> {
 	 * located)
 	 */
 	private final static String ENV = "ENV";
-	
+
 	/**
-	 * Token for process command 
+	 * Token for process command
 	 */
 	private final static String CMD = "CMD";
 
@@ -53,6 +59,10 @@ public class ConfigFileReader<T extends CallableProcess> {
 	 * Field separator
 	 */
 	private final static String SEP = "\\s";
+
+	private final static String CONFIG_FOLDER = "config";
+
+	//private final static String MAIN_DIR = "o2tab";
 
 	/**
 	 * @param input
@@ -75,12 +85,11 @@ public class ConfigFileReader<T extends CallableProcess> {
 	 */
 	public T setExternalArguments(T callableProcess) throws IOException,
 			BadConfigFileFormatException {
-		InputStream in = getClass().getResourceAsStream(input);
-		BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+		BufferedReader reader = this.getReader();
 		String line = null;
 		while ((line = reader.readLine()) != null) {
 			String[] arr = line.split(COMMENT);
-			if(arr.length == 0)
+			if (arr.length == 0)
 				continue;
 			String filterLine = line.split(COMMENT)[0];
 			if (filterLine.isEmpty())
@@ -95,7 +104,7 @@ public class ConfigFileReader<T extends CallableProcess> {
 				callableProcess.setMainCmdPath(args[1]);
 				continue;
 			}
-			if(filterLine.startsWith(CMD)){
+			if (filterLine.startsWith(CMD)) {
 				String[] args = getArgs(filterLine, 2);
 				callableProcess.setMainCmd(args[1]);
 			}
@@ -109,6 +118,20 @@ public class ConfigFileReader<T extends CallableProcess> {
 		return callableProcess;
 	}
 
+	private BufferedReader getReader() throws IOException {
+		Path path = Paths.get(System.getProperty("user.dir"));
+		FolderFind ff = new FolderFind();
+//		for(int i = 0; i < path.getNameCount(); i++){
+//			if(path.getName(i).toString().equals(MAIN_DIR)){
+//				path = path.subpath(0, i + 1).toAbsolutePath();
+//			}
+//		}
+		Files.walkFileTree(path, ff);
+		if (ff.getFound() == null)
+			throw new FileNotFoundException("Cannot find config file: " + input);
+		return new BufferedReader(new FileReader(ff.getFound().toString()));
+	}
+
 	private String[] getArgs(String line, int argsLenght)
 			throws BadConfigFileFormatException {
 		String[] args = line.split(SEP);
@@ -119,5 +142,29 @@ public class ConfigFileReader<T extends CallableProcess> {
 			throw new BadConfigFileFormatException(error);
 		}
 		return args;
+	}
+
+	private class FolderFind extends SimpleFileVisitor<Path> {
+		Path found = null;
+
+		@Override
+		public FileVisitResult preVisitDirectory(Path dir,
+				BasicFileAttributes attrs) throws IOException {
+			if (dir.getFileName().toString().equals(CONFIG_FOLDER)
+					&& Files.isDirectory(dir) && Files.isReadable(dir)) {
+				found = Paths.get(input).getFileName();
+				found = dir.resolve(found);
+				return FileVisitResult.TERMINATE;
+			}
+			return FileVisitResult.CONTINUE;
+		}
+
+		/**
+		 * @return the found
+		 */
+		public Path getFound() {
+			return found;
+		}
+
 	}
 }
