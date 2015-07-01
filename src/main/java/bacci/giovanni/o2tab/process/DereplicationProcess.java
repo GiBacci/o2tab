@@ -12,28 +12,64 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.TreeMap;
 
+import org.biojava.bio.BioException;
 import org.biojavax.bio.seq.RichSequenceIterator;
 
+import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 import bacci.giovanni.o2tab.util.Utils;
 
+/**
+ * Dereplication class
+ * 
+ * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
+ *         Bacci</a>
+ *
+ */
 public class DereplicationProcess extends PipelineProcess {
 
+	/**
+	 * The lowest number of times that a sequence has to be found in the file
+	 * for considering it a good sequence
+	 */
 	private final long minCount;
 
+	/**
+	 * The default charset
+	 */
 	private final static Charset CS = Charset.defaultCharset();
 
+	/**
+	 * The frequency map
+	 */
 	private Map<ByteSequence, Long> freq;
 
+	/**
+	 * Name of the output folder
+	 */
 	private final static String SUBDIR = "dereplicated";
 
+	/**
+	 * Name of the output file
+	 */
 	private final static String NAME = "dereplicated.fasta";
 
+	/**
+	 * Size flag
+	 */
 	private final static String FLAG = ";size=";
 
+	/**
+	 * Constructor
+	 * 
+	 * @param minCount
+	 *            the minimum size needed to include a sequence in the final
+	 *            output
+	 */
 	public DereplicationProcess(long minCount) {
 		super(ProcessType.DEREPLICATION);
 		this.minCount = minCount;
@@ -41,16 +77,21 @@ public class DereplicationProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws Exception {
-		if (super.getInputFiles() == null)
-			throw new NullPointerException("Input files are null");
+	public PipelineResult launch() throws IOException, InterruptedException {
 		if (super.getInputFiles().size() > 1)
-			throw new IllegalArgumentException("More than one input file: "
-					+ super.getInputFiles().size());
+			throw new WrongInputFileNumberException(1, super.getInputFiles()
+					.size());
+
 		String s = super.getInputFiles().get(0);
 		RichSequenceIterator it = Utils.getSequenceIterator(s);
-		while (it != null && it.hasNext()) {
-			this.addSequence(it.nextSequence().seqString());
+		try {
+			while (it != null && it.hasNext()) {
+				this.addSequence(it.nextSequence().seqString());
+			}
+		} catch (NoSuchElementException e) {
+			throw new IOException("Cannot read inside sequence file: " + s);
+		} catch (BioException e) {
+			throw new IOException("Sequence file is not well formatted " + s);
 		}
 		this.dumpResults();
 		// Adding pooled read file to the output. It will be needed by the
@@ -61,6 +102,12 @@ public class DereplicationProcess extends PipelineProcess {
 		return PipelineResult.PASSED;
 	}
 
+	/**
+	 * Add a sequence to the frequency table
+	 * 
+	 * @param sequence
+	 *            the sequence to add
+	 */
 	private void addSequence(String sequence) {
 		ByteSequence s = new ByteSequence(sequence);
 		if (freq.get(s) == null) {
@@ -70,6 +117,12 @@ public class DereplicationProcess extends PipelineProcess {
 		}
 	}
 
+	/**
+	 * Write all results in an output file
+	 * 
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 */
 	private void dumpResults() throws IOException {
 		BufferedWriter wr = this.getWriter();
 		Map<ByteSequence, Long> orderedFreq = new TreeMap<ByteSequence, Long>(
@@ -93,6 +146,11 @@ public class DereplicationProcess extends PipelineProcess {
 		wr.close();
 	}
 
+	/**
+	 * @return a writer for the output file
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 */
 	private BufferedWriter getWriter() throws IOException {
 		Path p = Paths.get(super.getOutputDir()).resolve(SUBDIR);
 		if (!Files.isDirectory(p))
@@ -103,6 +161,13 @@ public class DereplicationProcess extends PipelineProcess {
 		return new BufferedWriter(fw);
 	}
 
+	/**
+	 * Private class representing a byte sequence
+	 * 
+	 * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
+	 *         Bacci</a>
+	 *
+	 */
 	private class ByteSequence {
 
 		private byte[] seq;
@@ -156,6 +221,14 @@ public class DereplicationProcess extends PipelineProcess {
 
 	}
 
+	/**
+	 * Private comparator for ordering the entries in the frequency table based
+	 * on their frequency.
+	 * 
+	 * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
+	 *         Bacci</a>
+	 *
+	 */
 	private class CountComparator implements Comparator<ByteSequence> {
 
 		@Override

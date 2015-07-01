@@ -6,7 +6,12 @@ import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
+import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 
@@ -49,15 +54,10 @@ public class MappingProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws Exception {
-		if (super.getInputFiles() == null)
-			throw new NullPointerException("Input files are null");
-		if (super.getInputFiles().size() != 2) {
-			String error = String.format(
-					"Input files should be 2 but %d found", super
-							.getInputFiles().size());
-			throw new IllegalArgumentException(error);
-		}
+	public PipelineResult launch() throws IOException, InterruptedException {
+		if (super.getInputFiles().size() != 2) 
+			throw new WrongInputFileNumberException(2, super.getInputFiles().size());
+		
 		String input = super.getInputFiles().get(0);
 		String[] outs = this.getOutputs();
 
@@ -66,12 +66,18 @@ public class MappingProcess extends PipelineProcess {
 		otu.addArgumentCommand("-db", input);
 		otu.addArgumentCommand("-uc", outs[0]);
 		otu.setError(Redirect.to(new File(outs[1])));
-		int res = CONFIG.setExternalArguments(otu).call();
+		
+		ExecutorService ex = Executors.newFixedThreadPool(1);
+		Future<Integer> res = ex.submit(CONFIG.setExternalArguments(otu));
 
-		if (res == 0) {
-			return PipelineResult.PASSED;
-		} else {
-			return PipelineResult.FAILED;
+		try {
+			if (res.get() == 0) {
+				return PipelineResult.PASSED;
+			} else {
+				return PipelineResult.FAILED;
+			}
+		} catch (ExecutionException e) {
+			throw new IOException(e.getMessage());
 		}
 	}
 

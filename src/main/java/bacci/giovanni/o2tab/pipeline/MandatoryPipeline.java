@@ -1,6 +1,7 @@
 package bacci.giovanni.o2tab.pipeline;
 
-import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,52 +20,48 @@ public class MandatoryPipeline extends PipelineProcessQueue {
 
 	public MandatoryPipeline() {
 		super();
-		// TODO Auto-generated constructor stub
 	}
 
 	public MandatoryPipeline(int queueSize, Logger logger) {
 		super(queueSize, logger);
-		// TODO Auto-generated constructor stub
 	}
 
 	public MandatoryPipeline(int queueSize) {
 		super(queueSize);
-		// TODO Auto-generated constructor stub
 	}
 
 	public MandatoryPipeline(Logger logger) {
 		super(logger);
-		// TODO Auto-generated constructor stub
 	}
 
 	@Override
 	public void run() {
 		List<String> inputFiles = null;
 		for (int i = 0; i < super.processList.size(); i++) {
-			boolean first = i == 0;
+			boolean first = (i == 0);
 			PipelineProcess pp = super.processList.get(i);
-			PipelineResult res = null;
+			PipelineResult res = PipelineResult.FAILED;
+			if (!first && inputFiles != null)
+				pp.setInputFile(inputFiles);
+
 			try {
-				if (!first && inputFiles != null)
-					pp.setInputFile(inputFiles);
 				res = new MonitoredPipelineProcess(pp).launch();
-			} catch (FileNotFoundException e1) {
-				super.log(Level.SEVERE, "Input files not found", e1);
-				return;
-			} catch (Exception e) {
-				String msg = String.format(
-						"Error in %s process%n    message: %s",
-						pp.getProcessType(), e.getMessage());
-				super.log(Level.SEVERE, msg, e);
+			} catch (AccessDeniedException e) {
+				super.log(Level.SEVERE, "Access denied " + e.getMessage());
+				System.exit(-1);
+			} catch (IOException e) {
+				super.log(Level.SEVERE, e.getMessage());
+				System.exit(-1);
+			} catch (InterruptedException e) {
 				return;
 			}
 
-			if (res == null || res == PipelineResult.FAILED) {
+			if (res == PipelineResult.FAILED) {
 				String msg = String.format(
 						"Pipeline process failed%n    name: %s", pp.getClass()
 								.getName());
 				super.log(Level.SEVERE, msg);
-				return;
+				System.exit(-1);
 			}
 			inputFiles = pp.getOutputFiles();
 		}

@@ -3,6 +3,7 @@ package bacci.giovanni.o2tab.context;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import bacci.giovanni.o2tab.pipeline.MandatoryPipeline;
+import bacci.giovanni.o2tab.pipeline.PipelineProcess;
 import bacci.giovanni.o2tab.pipeline.PipelineProcessQueue;
 import bacci.giovanni.o2tab.process.ClusteringOTU;
 import bacci.giovanni.o2tab.process.DereplicationProcess;
@@ -55,9 +57,11 @@ public class MicrobiomeContext {
 		this.queue = new MandatoryPipeline(log);
 		try {
 			this.parseArgs(args);
-		} catch (IOException e1) {
-			String msg = String.format("I/O error occurs%n message: %s", e1.getMessage());
-			queue.log(Level.SEVERE, msg);
+		} catch (NoSuchFileException e) {
+			log.log(Level.SEVERE, "File not found " + e.getMessage());
+			System.exit(-1);
+		} catch (IOException e) {
+			log.log(Level.SEVERE, e.getMessage());
 			System.exit(-1);
 		}
 	}
@@ -140,49 +144,32 @@ public class MicrobiomeContext {
 
 		// Adjusting inputs
 		Path in = Paths.get(set.valueOf(input));
-		if (!Files.isDirectory(in))
-			throw new FileNotFoundException(
-					"Input folder not found or it is not a folder");
-		if (Files.isDirectory(in) && !Files.isReadable(in))
-			throw new FileNotFoundException("Cannot read inside input folder");
-
 		List<String> inputs = new ArrayList<String>();
 		String glob = (set.has(filter)) ? String.format("*%s*",
 				set.valuesOf(filter)) : "*";
 		for (Path p : Files.newDirectoryStream(in, glob))
 			inputs.add(p.toString());
 
-		if (inputs.size() < 1)
+		if (inputs.size() == 0)
 			throw new FileNotFoundException(
 					"No files found with the given filter");
 
 		// Log file
-		Path logPath = (set.has(log)) ? Paths.get(set.valueOf(log)) : in
-				.resolve("o2tab.log");
+		Path logPath = (set.has(log)) ? Paths.get(set.valueOf(log)) : Paths
+				.get(System.getProperty("user.dir")).resolve("o2tab.log");
 		FileHandler handler = new FileHandler(logPath.toString());
 		handler.setFormatter(new SimpleFormatter());
 		this.log.addHandler(handler);
 
 		// Adjusting outputs
-		if (set.has(output)) {
-			Path o = Paths.get(set.valueOf(output));
-			if (!Files.isDirectory(o))
-				throw new FileNotFoundException(
-						"Output directory does not exist or it is not a directory");
-			if (!Files.isWritable(in))
-				throw new IllegalArgumentException(
-						"Cannot write inside output folder");
-			queue.setMainOutputDir(set.valueOf(output).toString());
-		} else {
-			if (!Files.isWritable(in))
-				throw new IllegalArgumentException(
-						"Cannot write inside output folder");
-			queue.setMainOutputDir(in.toString());
-		}
+		Path o = (set.has(output)) ? Paths.get(set.valueOf(output)) : Paths
+				.get(PipelineProcess.getDefaultOutput());
+		queue.setMainOutputDir(o.toString());
 
 		// Assambly process
 		int threadNum = (set.has(thread)) ? set.valueOf(thread) : 1;
 		boolean assembly = false;
+
 		if (set.has(mate)) {
 			String mate1 = set.valuesOf(mate).get(0);
 			String mate2 = set.valuesOf(mate).get(1);
@@ -221,7 +208,7 @@ public class MicrobiomeContext {
 	private void printHelpAndExit(OptionParser parser) {
 		try {
 			System.out
-					.println("Usage: java -jar o2tab.jar --in <folder> <options>");
+					.println("Usage: java -jar o2tab-[version].jar --in <folder> <options>");
 			System.out
 					.println("--------------------------------------------------------------------");
 			parser.printHelpOn(System.out);

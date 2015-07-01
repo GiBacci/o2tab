@@ -52,11 +52,9 @@ public class PoolingProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws Exception {
-		if (getInputFiles() == null)
-			throw new NullPointerException("Input files are null");
+	public PipelineResult launch() throws IOException, InterruptedException {
 		BufferedWriter writer = createWriter();
-		for (String file : getInputFiles()) {
+		for (String file : super.getInputFiles()) {
 			String barcode = getBarcode(file);
 			try {
 				RichSequenceIterator it = Utils.getSequenceIterator(file);
@@ -74,8 +72,8 @@ public class PoolingProcess extends PipelineProcess {
 					writer.flush();
 				}
 			} catch (BioException e) {
-				throw new BioException("Could not read sequence in file: "
-						+ barcode);
+				throw new IOException("Could not read sequence file: "
+						+ file);
 			}
 		}
 		writer.close();

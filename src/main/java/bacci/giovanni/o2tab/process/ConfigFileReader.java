@@ -60,9 +60,10 @@ public class ConfigFileReader<T extends CallableProcess> {
 	 */
 	private final static String SEP = "\\s";
 
+	/**
+	 * The name of the folder containing the config files
+	 */
 	private final static String CONFIG_FOLDER = "config";
-
-	//private final static String MAIN_DIR = "o2tab";
 
 	/**
 	 * @param input
@@ -80,11 +81,8 @@ public class ConfigFileReader<T extends CallableProcess> {
 	 * @return the process with the all the options added
 	 * @throws IOException
 	 *             if an I/O error occurs
-	 * @throws BadConfigFileFormatException
-	 *             if the config file is not well formatted
 	 */
-	public T setExternalArguments(T callableProcess) throws IOException,
-			BadConfigFileFormatException {
+	public T setExternalArguments(T callableProcess) throws IOException {
 		BufferedReader reader = this.getReader();
 		String line = null;
 		while ((line = reader.readLine()) != null) {
@@ -118,20 +116,29 @@ public class ConfigFileReader<T extends CallableProcess> {
 		return callableProcess;
 	}
 
+	/**
+	 * @return a reader pointing to the config file
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 */
 	private BufferedReader getReader() throws IOException {
 		Path path = Paths.get(System.getProperty("user.dir"));
 		FolderFind ff = new FolderFind();
-//		for(int i = 0; i < path.getNameCount(); i++){
-//			if(path.getName(i).toString().equals(MAIN_DIR)){
-//				path = path.subpath(0, i + 1).toAbsolutePath();
-//			}
-//		}
 		Files.walkFileTree(path, ff);
 		if (ff.getFound() == null)
 			throw new FileNotFoundException("Cannot find config file: " + input);
 		return new BufferedReader(new FileReader(ff.getFound().toString()));
 	}
 
+	/**
+	 * @param line
+	 *            the line of the config file
+	 * @param argsLenght
+	 *            the length of the arguments
+	 * @return an array with the parsed arguments
+	 * @throws BadConfigFileFormatException
+	 *             if the file is not well formatted
+	 */
 	private String[] getArgs(String line, int argsLenght)
 			throws BadConfigFileFormatException {
 		String[] args = line.split(SEP);
@@ -144,6 +151,13 @@ public class ConfigFileReader<T extends CallableProcess> {
 		return args;
 	}
 
+	/**
+	 * Searches for the config file
+	 * 
+	 * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
+	 *         Bacci</a>
+	 *
+	 */
 	private class FolderFind extends SimpleFileVisitor<Path> {
 		Path found = null;
 

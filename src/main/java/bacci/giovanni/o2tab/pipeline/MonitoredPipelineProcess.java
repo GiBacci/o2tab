@@ -1,5 +1,7 @@
 package bacci.giovanni.o2tab.pipeline;
 
+import java.io.IOException;
+
 /**
  * Pipeline process wrapper.
  * 
@@ -14,10 +16,24 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	 */
 	private final PipelineProcess process;
 
+	/**
+	 * The result
+	 */
 	private PipelineResult res;
 
-	private Exception ex;
+	/**
+	 * A possible IOExcpetion
+	 */
+	private IOException ioex = null;
 
+	/**
+	 * A possible InterruptedException
+	 */
+	private InterruptedException intex = null;
+
+	/**
+	 * String array for monitoring the process
+	 */
 	private final static String[] WAIT = { "   ", ".  ", ".. ", "..." };
 
 	/**
@@ -32,19 +48,22 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws Exception {
+	public PipelineResult launch() throws IOException, InterruptedException {
 		Thread t = new Thread(new Runnable() {
 			@Override
 			public void run() {
 				try {
 					res = process.launch();
-				} catch (Exception e) {
-					ex = e;
+				} catch (IOException e) {
+					ioex = e;
+				} catch (InterruptedException e) {
+					intex = e;
 				}
 			}
 		});
 		t.start();
 		int index = 0;
+
 		try {
 			while (t.isAlive()) {
 				System.out.print(formatMsg(WAIT[index++], true));
@@ -57,21 +76,47 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 			System.out.println(" process interrupted");
 			t.interrupt();
 		}
-		if (ex != null) {
-			System.out.println(" process exited with error/s");
-			throw ex;
-		}
+
+		this.checkExceptions();
+
 		if (res == PipelineResult.PASSED) {
 			System.out.println(" process finished correctly");
 		} else {
-			String msg = String.format(
-					" process fail.%n    Check log file in: %s%n",
-					process.getOutputDir());
-			System.out.println(msg);
+			System.out.println(" process fail");
 		}
 		return res;
 	}
 
+	/**
+	 * Checks if the exceptions are not <code>null</code> throwing them
+	 * 
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 * @throws InterruptedException
+	 *             if the process has been interrupted
+	 */
+	private void checkExceptions() throws IOException, InterruptedException {
+		String msg = " process exited with error/s";
+		if (ioex != null) {
+			System.out.println(msg);
+			throw ioex;
+		}
+		if (intex != null) {
+			System.out.println(msg);
+			throw ioex;
+		}
+	}
+
+	/**
+	 * Formats monitoring string
+	 * 
+	 * @param wait
+	 *            the string
+	 * @param carriage
+	 *            if the carriage return character has to be placed at the end
+	 *            of the string
+	 * @return a formatted string
+	 */
 	private String formatMsg(String wait, boolean carriage) {
 		if (carriage) {
 			return String.format("%s process started %s\r",

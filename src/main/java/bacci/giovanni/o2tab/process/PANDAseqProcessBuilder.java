@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -103,10 +104,7 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws Exception {
-		if (getInputFiles() == null)
-			throw new NullPointerException("Input files are null");
-
+	public PipelineResult launch() throws IOException, InterruptedException {
 		List<Path> forward = new ArrayList<Path>();
 		List<Path> reverse = new ArrayList<Path>();
 
@@ -127,7 +125,7 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 
 		for (int i = 0; i < forward.size(); i++) {
 			String out = getOutputPath(forward.get(i).getFileName().toString());
-			addOuptuFile(out);
+			super.addOuptuFile(out);
 			PANDAseqProcess panda = new PANDAseqProcess(forward.get(i)
 					.toString(), reverse.get(i).toString(), enc);
 			panda.setOutput(Redirect.to(new File(out)));
@@ -138,9 +136,13 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 		ExecutorService ex = Executors.newFixedThreadPool(numThread);
 		List<Future<Integer>> results = ex.invokeAll(processList);
 		for (Future<Integer> res : results) {
-			if (res.get() != 0) {
-				ex.shutdownNow();
-				return PipelineResult.FAILED;
+			try {
+				if (res.get() != 0) {
+					ex.shutdownNow();
+					return PipelineResult.FAILED;
+				}
+			} catch (ExecutionException e) {
+				throw new IOException(e.getMessage());
 			}
 		}
 		ex.shutdown();
@@ -159,7 +161,6 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	private String getOutputPath(String fileName) throws IOException {
 		Path o = Paths.get(super.getOutputDir());
 		Path out = o.resolve(SUBDIR).resolve(fileName + OUTSUFFIX);
-
 		if (!Files.isDirectory(out.getParent()))
 			Files.createDirectories(out.getParent());
 		return out.toString();

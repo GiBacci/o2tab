@@ -6,7 +6,12 @@ import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
+import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 
@@ -48,12 +53,10 @@ public class TableProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws Exception {
-		if (super.getInputFiles() == null)
-			throw new NullPointerException("Input files are null");
+	public PipelineResult launch() throws IOException, InterruptedException {
 		if (super.getInputFiles().size() > 1)
-			throw new IllegalArgumentException("More than one input file: "
-					+ super.getInputFiles().size());
+			throw new WrongInputFileNumberException(1, super.getInputFiles()
+					.size());
 
 		String input = super.getInputFiles().get(0);
 		String[] outs = this.getOutputs();
@@ -63,12 +66,17 @@ public class TableProcess extends PipelineProcess {
 		tab.setOutput(Redirect.to(new File(outs[0])));
 		tab.setError(Redirect.to(new File(outs[1])));
 
-		int res = CONFIG.setExternalArguments(tab).call();
+		ExecutorService ex = Executors.newFixedThreadPool(1);
+		Future<Integer> res = ex.submit(CONFIG.setExternalArguments(tab));
 
-		if (res == 0) {
-			return PipelineResult.PASSED;
-		} else {
-			return PipelineResult.FAILED;
+		try {
+			if (res.get() == 0) {
+				return PipelineResult.PASSED;
+			} else {
+				return PipelineResult.FAILED;
+			}
+		} catch (ExecutionException e) {
+			throw new IOException(e);
 		}
 	}
 

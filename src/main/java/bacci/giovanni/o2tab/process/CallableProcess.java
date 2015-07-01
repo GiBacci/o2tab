@@ -1,6 +1,7 @@
 package bacci.giovanni.o2tab.process;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -164,7 +165,7 @@ public abstract class CallableProcess implements Callable<Integer> {
 	 * @see java.util.concurrent.Callable#call()
 	 */
 	@Override
-	public Integer call() throws Exception {
+	public Integer call() throws IOException, InterruptedException {
 		ProcessBuilder pb = new ProcessBuilder(getCommands());
 		if (runningDir != null)
 			pb.directory(new File(runningDir));

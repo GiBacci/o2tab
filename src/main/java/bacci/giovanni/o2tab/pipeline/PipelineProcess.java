@@ -1,7 +1,6 @@
 package bacci.giovanni.o2tab.pipeline;
 
-import java.io.FileNotFoundException;
-import java.nio.file.Files;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,18 +57,8 @@ public abstract class PipelineProcess {
 	 * @param inputFiles
 	 *            the input files
 	 * @return this pipeline process
-	 * @throws FileNotFoundException
-	 *             if one (or more) file does not exist
-	 * @throws NullPointerException
-	 *             if the input files are <code>null</code>
 	 */
-	public PipelineProcess setInputFile(List<String> inputFiles)
-			throws FileNotFoundException {
-		if (inputFiles == null)
-			throw new NullPointerException();
-		for (String s : inputFiles)
-			if (!Files.exists(Paths.get(s)))
-				throw new FileNotFoundException();
+	public PipelineProcess setInputFile(List<String> inputFiles) {
 		this.inputFiles = inputFiles;
 		return this;
 	}
@@ -128,10 +117,13 @@ public abstract class PipelineProcess {
 	 * @return {@link PipelineResult#PASSED} if the process has done everithing
 	 *         correctly, otherwise this method will return
 	 *         {@link PipelineResult#FAILED}
-	 * @throws Exception
-	 *             if an Exception occurs
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 * @throws InterruptedException
+	 *             if a process has been interrupted
 	 */
-	public abstract PipelineResult launch() throws Exception;
+	public abstract PipelineResult launch() throws IOException,
+			InterruptedException;
 
 	/**
 	 * Pipeline result tokens

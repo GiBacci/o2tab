@@ -6,7 +6,12 @@ import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
+import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 
@@ -43,13 +48,13 @@ public class ClusteringOTU extends PipelineProcess {
 	/**
 	 * Label for OTUs
 	 */
-	private static final String LABEL = "OTU_";		
+	private static final String LABEL = "OTU_";
 
 	/**
 	 * The config file reader
 	 */
 	private final static ConfigFileReader<UparseOTUProcess> CONFIG = new ConfigFileReader<ClusteringOTU.UparseOTUProcess>(
-			"/otucluster.config");	
+			"/otucluster.config");
 
 	/**
 	 * Constructor
@@ -59,15 +64,10 @@ public class ClusteringOTU extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws Exception {
-		if (super.getInputFiles() == null)
-			throw new NullPointerException("Input files are null");
-		if (super.getInputFiles().size() != 2) {
-			String error = String.format(
-					"Input files should be 2 but %d found", super
-							.getInputFiles().size());
-			throw new IllegalArgumentException(error);
-		}
+	public PipelineResult launch() throws IOException, InterruptedException {
+		if (super.getInputFiles().size() != 2)
+			throw new WrongInputFileNumberException(2, super.getInputFiles()
+					.size());
 
 		String input = super.getInputFiles().get(0);
 		String[] outputs = this.getOutput();
@@ -82,12 +82,19 @@ public class ClusteringOTU extends PipelineProcess {
 		clusteringProcess.addArgumentCommand("-relabel", LABEL);
 		clusteringProcess.setError(Redirect.to(new File(outputs[2])));
 
-		int res = CONFIG.setExternalArguments(clusteringProcess).call();
+		ExecutorService ex = Executors.newFixedThreadPool(1);
 
-		if (res == 0) {
-			return PipelineResult.PASSED;
-		} else {
-			return PipelineResult.FAILED;
+		Future<Integer> res = ex.submit(CONFIG
+				.setExternalArguments(clusteringProcess));
+
+		try {
+			if (res.get() == 0) {
+				return PipelineResult.PASSED;
+			} else {
+				return PipelineResult.FAILED;
+			}
+		} catch (ExecutionException e) {
+			throw new IOException(e.getMessage());
 		}
 	}
 
