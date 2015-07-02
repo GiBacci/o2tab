@@ -77,7 +77,7 @@ public class DereplicationProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException, InterruptedException {
+	public PipelineResult launch() throws IOException {
 		if (super.getInputFiles().size() > 1)
 			throw new WrongInputFileNumberException(1, super.getInputFiles()
 					.size());

@@ -64,7 +64,7 @@ public class ClusteringOTU extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException, InterruptedException {
+	public PipelineResult launch() throws IOException {
 		if (super.getInputFiles().size() != 2)
 			throw new WrongInputFileNumberException(2, super.getInputFiles()
 					.size());
@@ -95,6 +95,9 @@ public class ClusteringOTU extends PipelineProcess {
 			}
 		} catch (ExecutionException e) {
 			throw new IOException(e.getMessage());
+		} catch (InterruptedException e){
+			ex.shutdownNow();
+			return PipelineResult.INTERRUPTED;
 		}
 	}
 

@@ -27,11 +27,6 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	private IOException ioex = null;
 
 	/**
-	 * A possible InterruptedException
-	 */
-	private InterruptedException intex = null;
-
-	/**
 	 * String array for monitoring the process
 	 */
 	private final static String[] WAIT = { "   ", ".  ", ".. ", "..." };
@@ -48,7 +43,7 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException, InterruptedException {
+	public PipelineResult launch() throws IOException {
 		Thread t = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -56,8 +51,6 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 					res = process.launch();
 				} catch (IOException e) {
 					ioex = e;
-				} catch (InterruptedException e) {
-					intex = e;
 				}
 			}
 		});
@@ -77,13 +70,22 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 			t.interrupt();
 		}
 
-		this.checkExceptions();
+		this.checkException();
 
-		if (res == PipelineResult.PASSED) {
+		switch (res) {
+		case PASSED:
 			System.out.println(" process finished correctly");
-		} else {
+			break;
+		case INTERRUPTED:
+			System.out.println(" process interrupted");
+			break;
+		case FAILED:
 			System.out.println(" process fail");
+			break;
+		default:
+			break;
 		}
+		
 		return res;
 	}
 
@@ -92,16 +94,10 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	 * 
 	 * @throws IOException
 	 *             if an I/O error occurs
-	 * @throws InterruptedException
-	 *             if the process has been interrupted
 	 */
-	private void checkExceptions() throws IOException, InterruptedException {
+	private void checkException() throws IOException {
 		String msg = " process exited with error/s";
 		if (ioex != null) {
-			System.out.println(msg);
-			throw ioex;
-		}
-		if (intex != null) {
 			System.out.println(msg);
 			throw ioex;
 		}

@@ -16,6 +16,7 @@ import java.util.concurrent.Future;
 
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
+import bacci.giovanni.o2tab.util.QualityEncoding;
 
 /**
  * Builder for {@link PANDAseqProcess}.
@@ -104,7 +105,7 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException, InterruptedException {
+	public PipelineResult launch() throws IOException {
 		List<Path> forward = new ArrayList<Path>();
 		List<Path> reverse = new ArrayList<Path>();
 
@@ -125,7 +126,6 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 
 		for (int i = 0; i < forward.size(); i++) {
 			String out = getOutputPath(forward.get(i).getFileName().toString());
-			super.addOuptuFile(out);
 			PANDAseqProcess panda = new PANDAseqProcess(forward.get(i)
 					.toString(), reverse.get(i).toString(), enc);
 			panda.setOutput(Redirect.to(new File(out)));
@@ -134,16 +134,19 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 		}
 
 		ExecutorService ex = Executors.newFixedThreadPool(numThread);
-		List<Future<Integer>> results = ex.invokeAll(processList);
-		for (Future<Integer> res : results) {
-			try {
+		try {
+			List<Future<Integer>> results = ex.invokeAll(processList);
+			for (Future<Integer> res : results) {
 				if (res.get() != 0) {
 					ex.shutdownNow();
 					return PipelineResult.FAILED;
 				}
-			} catch (ExecutionException e) {
-				throw new IOException(e.getMessage());
 			}
+		} catch (ExecutionException e) {
+			throw new IOException(e.getMessage());
+		} catch (InterruptedException e) {
+			ex.shutdownNow();
+			return PipelineResult.INTERRUPTED;
 		}
 		ex.shutdown();
 		return PipelineResult.PASSED;
@@ -163,35 +166,28 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 		Path out = o.resolve(SUBDIR).resolve(fileName + OUTSUFFIX);
 		if (!Files.isDirectory(out.getParent()))
 			Files.createDirectories(out.getParent());
+		super.addOuptuFile(out.toString());
 		return out.toString();
 	}
-	
+
 	/**
-	 * The quality encoding
+	 * PANDAseqProcess
 	 * 
 	 * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
 	 *         Bacci</a>
 	 *
 	 */
-	public enum QualityEncoding {
-		PHRED33, PHRED64;
-	}
-	
-	/**
-	 * PANDAseqProcess
-	 * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni Bacci</a>
-	 *
-	 */
 	private class PANDAseqProcess extends CallableProcess {
 
-		public PANDAseqProcess(String forward, String reverse, QualityEncoding enc) {
+		public PANDAseqProcess(String forward, String reverse,
+				QualityEncoding enc) {
 			super("pandaseq");
 			addArgumentCommand("-f", forward);
 			addArgumentCommand("-r", reverse);
-			if(enc == QualityEncoding.PHRED64)
+			if (enc == QualityEncoding.PHRED64)
 				addSingleCommand("-6");
 		}
-		
+
 	}
 
 }

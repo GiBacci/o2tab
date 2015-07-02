@@ -122,8 +122,7 @@ public abstract class PipelineProcess {
 	 * @throws InterruptedException
 	 *             if a process has been interrupted
 	 */
-	public abstract PipelineResult launch() throws IOException,
-			InterruptedException;
+	public abstract PipelineResult launch() throws IOException;
 
 	/**
 	 * Pipeline result tokens
@@ -133,7 +132,7 @@ public abstract class PipelineProcess {
 	 *
 	 */
 	public enum PipelineResult {
-		FAILED, PASSED;
+		FAILED, PASSED, INTERRUPTED;
 	}
 
 }

@@ -52,9 +52,10 @@ public class MandatoryPipeline extends PipelineProcessQueue {
 			} catch (IOException e) {
 				super.log(Level.SEVERE, e.getMessage());
 				System.exit(-1);
-			} catch (InterruptedException e) {
-				return;
 			}
+			
+			if(res == PipelineResult.INTERRUPTED)
+				return;
 
 			if (res == PipelineResult.FAILED) {
 				String msg = String.format(

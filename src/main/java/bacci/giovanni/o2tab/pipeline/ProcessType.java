@@ -1,6 +1,7 @@
 package bacci.giovanni.o2tab.pipeline;
 
 public enum ProcessType {
+	TRIMMING("Trimming"),
 	POOLING("Pooling"),
 	DEREPLICATION("Dereplication"),
 	ASSEMBLY("Assembling"),

@@ -53,7 +53,7 @@ public class TableProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException, InterruptedException {
+	public PipelineResult launch() throws IOException {
 		if (super.getInputFiles().size() > 1)
 			throw new WrongInputFileNumberException(1, super.getInputFiles()
 					.size());
@@ -77,6 +77,9 @@ public class TableProcess extends PipelineProcess {
 			}
 		} catch (ExecutionException e) {
 			throw new IOException(e);
+		} catch (InterruptedException e) {
+			ex.shutdownNow();
+			return PipelineResult.INTERRUPTED;
 		}
 	}
 

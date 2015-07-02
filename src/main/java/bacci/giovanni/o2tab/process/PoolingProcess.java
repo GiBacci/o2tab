@@ -16,12 +16,15 @@ import bacci.giovanni.o2tab.pipeline.ProcessType;
 import bacci.giovanni.o2tab.util.Utils;
 
 /**
- * Pooling class for multiple FASTA files
+ * Pooling class for multiple FASTA files.
+ * 
+ * @deprecated use {@link MultiPoolingProcess} instead
  * 
  * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
  *         Bacci</a>
  *
  */
+@Deprecated
 public class PoolingProcess extends PipelineProcess {
 
 	/**
@@ -42,7 +45,7 @@ public class PoolingProcess extends PipelineProcess {
 	/**
 	 * If > 0 sequences will be truncated at the specified index.
 	 */
-	private int truncate = -1;	
+	private int truncate = -1;
 
 	/**
 	 * Constructor
@@ -52,8 +55,9 @@ public class PoolingProcess extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException, InterruptedException {
+	public PipelineResult launch() throws IOException {
 		BufferedWriter writer = createWriter();
+
 		for (String file : super.getInputFiles()) {
 			String barcode = getBarcode(file);
 			try {
@@ -72,10 +76,10 @@ public class PoolingProcess extends PipelineProcess {
 					writer.flush();
 				}
 			} catch (BioException e) {
-				throw new IOException("Could not read sequence file: "
-						+ file);
+				throw new IOException("Could not read sequence file: " + file);
 			}
 		}
+
 		writer.close();
 		return PipelineResult.PASSED;
 	}

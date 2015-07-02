@@ -2,11 +2,9 @@ package bacci.giovanni.o2tab.context;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -23,10 +21,12 @@ import bacci.giovanni.o2tab.pipeline.PipelineProcessQueue;
 import bacci.giovanni.o2tab.process.ClusteringOTU;
 import bacci.giovanni.o2tab.process.DereplicationProcess;
 import bacci.giovanni.o2tab.process.MappingProcess;
+import bacci.giovanni.o2tab.process.MultiPoolingProcess;
 import bacci.giovanni.o2tab.process.PANDAseqProcessBuilder;
-import bacci.giovanni.o2tab.process.PANDAseqProcessBuilder.QualityEncoding;
-import bacci.giovanni.o2tab.process.PoolingProcess;
+import bacci.giovanni.o2tab.process.StreamingTrimLight;
 import bacci.giovanni.o2tab.process.TableProcess;
+import bacci.giovanni.o2tab.util.QualityEncoding;
+import bacci.giovanni.o2tab.util.Utils;
 
 /**
  * Context class for microbiome pipeline
@@ -92,6 +92,10 @@ public class MicrobiomeContext {
 				.withRequiredArg().withValuesSeparatedBy(",")
 				.ofType(String.class);
 
+		OptionSpec<Integer> cutoff = parser
+				.accepts("cutoff", "quality cutoff for trimming step")
+				.withRequiredArg().ofType(Integer.class);
+
 		OptionSpec<String> input = parser.accepts("in", "the input folder")
 				.withRequiredArg().ofType(String.class).required();
 
@@ -108,7 +112,8 @@ public class MicrobiomeContext {
 
 		OptionSpec<Integer> truncate = parser
 				.accepts("trunc", "truncates the reads to a fixed length")
-				.withRequiredArg().ofType(Integer.class);
+				.withRequiredArg().withValuesSeparatedBy(',')
+				.ofType(Integer.class);
 
 		OptionSpec<String> filter = parser
 				.accepts("filter",
@@ -143,16 +148,12 @@ public class MicrobiomeContext {
 		// Retriving params
 
 		// Adjusting inputs
-		Path in = Paths.get(set.valueOf(input));
-		List<String> inputs = new ArrayList<String>();
-		String glob = (set.has(filter)) ? String.format("*%s*",
-				set.valuesOf(filter)) : "*";
-		for (Path p : Files.newDirectoryStream(in, glob))
-			inputs.add(p.toString());
+		String in = set.valueOf(input);
+		String contains = (set.has(filter)) ? set.valueOf(filter) : null;
+		List<String> inputs = Utils.getInputs(in, contains);
 
 		if (inputs.size() == 0)
-			throw new FileNotFoundException(
-					"No files found with the given filter");
+			throw new FileNotFoundException("No file found");
 
 		// Log file
 		Path logPath = (set.has(log)) ? Paths.get(set.valueOf(log)) : Paths
@@ -166,27 +167,46 @@ public class MicrobiomeContext {
 				.get(PipelineProcess.getDefaultOutput());
 		queue.setMainOutputDir(o.toString());
 
-		// Assambly process
-		int threadNum = (set.has(thread)) ? set.valueOf(thread) : 1;
-		boolean assembly = false;
+		// Quality encoding
+		QualityEncoding enc = (set.has(enc64)) ? QualityEncoding.PHRED64
+				: QualityEncoding.PHRED33;
 
-		if (set.has(mate)) {
+		// Thread Number
+		int threadNum = (set.has(thread)) ? set.valueOf(thread) : 1;
+
+		// Trimming
+		boolean trimming = set.has(cutoff);
+		if (trimming) {
+			queue.addPipelineProcess(new StreamingTrimLight()
+					.cutoff(set.valueOf(cutoff)).enc(enc).thread(threadNum)
+					.setInputFile(inputs));
+		}
+
+		// Assambly process
+		boolean assembly = set.has(mate);
+		if (assembly) {
 			String mate1 = set.valuesOf(mate).get(0);
 			String mate2 = set.valuesOf(mate).get(1);
-			QualityEncoding enc = (set.has(enc64)) ? QualityEncoding.PHRED64
-					: QualityEncoding.PHRED33;
-			queue.addPipelineProcess(new PANDAseqProcessBuilder(mate1, mate2)
-					.enc(enc).thread(threadNum).setInputFile(inputs));
-			assembly = true;
+			PANDAseqProcessBuilder panda = new PANDAseqProcessBuilder(mate1,
+					mate2).enc(enc).thread(threadNum);
+			if (trimming) {
+				queue.addPipelineProcess(panda);
+			} else {
+				queue.addPipelineProcess(panda.setInputFile(inputs));
+			}
 		}
 
 		// Pooling process
-		int trun = (set.has(truncate)) ? set.valueOf(truncate) : -1;
+		Integer[] trun = (set.has(truncate)) ? set.valuesOf(truncate).toArray(
+				new Integer[set.valuesOf(truncate).size()]) : new Integer[] {
+				-1, -1 };
+		MultiPoolingProcess pooling = new MultiPoolingProcess().thread(
+				threadNum).truncate(trun[0], trun[1]);
+
 		if (assembly) {
-			queue.addPipelineProcess(new PoolingProcess().truncate(trun));
+			queue.addPipelineProcess(pooling);
 		} else {
-			queue.addPipelineProcess(new PoolingProcess().truncate(trun)
-					.setInputFile(inputs));
+			queue.addPipelineProcess(pooling.setInputFile(inputs));
 		}
 
 		// Dereplication process

@@ -83,29 +83,41 @@ public class ExternalDependencyTest extends TestCase {
 		List<String> inputs = getTestResources("*.fasta");
 		assertEquals(2, inputs.size());
 		Collections.sort(inputs);
-
+		String processName = "usearch";
 		try {
 			PipelineProcess otu = new ClusteringOTU().setInputFile(inputs);
-			assertEquals(PipelineResult.PASSED, otu.launch());
+			processName = otu.getProcessType().toString();
+			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
+					otu.launch());
 			PipelineProcess map = new MappingProcess().setInputFile(otu
 					.getOutputFiles());
-			assertEquals(PipelineResult.PASSED, map.launch());
+			processName = map.getProcessType().toString();
+			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
+					map.launch());
 			PipelineProcess tab = new TableProcess().setInputFile(map
 					.getOutputFiles());
-			assertEquals(PipelineResult.PASSED, tab.launch());
+			processName = tab.getProcessType().toString();
+			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
+					tab.launch());
 		} catch (FileNotFoundException e) {
 			fail("Test files not found");
-		} catch (Exception e) {
-			fail(this.formatErrorMessage("usearch", e));
+		} catch (IOException e) {
+			fail(formatErrorMessage(processName, e));
 		}
 
 	}
 
 	private String formatErrorMessage(String program, Exception e) {
-		String msg = String
-				.format("Error launching %s%n message: %s%n Try to modify the "
-						+ "config file or reinstall the program",
-						program, e.getMessage());
+		String msg = String.format(
+				"Error launching %s%n message: %s%n Try to modify the "
+						+ "config file or reinstall the program", program,
+				e.getMessage());
+		return msg;
+	}
+
+	private String formatFailMessage(String program) {
+		String msg = String.format("Process %s failed: try to modify the "
+				+ "config file or reinstall the program", program);
 		return msg;
 	}
 
