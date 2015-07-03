@@ -49,15 +49,16 @@ public class MandatoryPipeline extends PipelineProcessQueue {
 				res = new MonitoredPipelineProcess(pp).launch();
 			} catch (AccessDeniedException e) {
 				super.log(Level.SEVERE, "Access denied " + e.getMessage());
+				System.exit(-1);
 			} catch (NoSuchFileException e) {
 				super.log(Level.SEVERE,
 						"No file/directoy found: " + e.getMessage());
+				System.exit(-1);
 			} catch (IOException e) {
 				super.log(Level.SEVERE, e.getMessage());
-			} finally {
 				System.exit(-1);
-			}
-
+			} 
+			
 			if (res.getRes() == PipelineResult.INTERRUPTED)
 				return;
 

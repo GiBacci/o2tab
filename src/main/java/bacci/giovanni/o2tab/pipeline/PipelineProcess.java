@@ -105,7 +105,7 @@ public abstract class PipelineProcess {
 	 * @param output
 	 *            the output directory
 	 */
-	protected void setMainOutputDir(String output) {
+	public void setMainOutputDir(String output) {
 		this.mainOutputDir = output;
 	}
 

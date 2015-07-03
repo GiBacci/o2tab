@@ -21,7 +21,7 @@ import bacci.giovanni.o2tab.process.CallableProcess;
  */
 public abstract class PipelineProcessQueue implements Runnable {
 
-	private static final String OUT_FOLDER = "o2tab_output";
+	public static final String OUT_FOLDER = "o2tab_output";
 	
 	/**
 	 * Process list

@@ -16,11 +16,13 @@ import java.util.List;
 import junit.framework.TestCase;
 
 import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.BlockJUnit4ClassRunner;
 
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.PipelineProcessQueue;
 import bacci.giovanni.o2tab.pipeline.ProcessResult;
 import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.process.ClusteringOTU;
@@ -31,13 +33,18 @@ import bacci.giovanni.o2tab.process.TableProcess;
 @RunWith(BlockJUnit4ClassRunner.class)
 public class ExternalDependencyTest extends TestCase {
 
+	private static Path outTest = Paths.get(PipelineProcess.getDefaultOutput())
+			.resolve(PipelineProcessQueue.OUT_FOLDER);
+
 	@Test
 	public void testPandaSeq() {
 		List<String> inputs = this.getTestResources("*.fastq");
 		assertEquals(2, inputs.size());
 		PipelineProcess panda = null;
 		try {
-			panda = new PANDAseqProcessBuilder("_1", "_2").setInputFiles(inputs);
+			panda = new PANDAseqProcessBuilder("_1", "_2")
+					.setInputFiles(inputs);
+			panda.setMainOutputDir(outTest.toString());
 			ProcessResult out = panda.launch();
 			assertEquals(PipelineResult.PASSED, out.getRes());
 		} catch (FileNotFoundException e) {
@@ -65,12 +72,24 @@ public class ExternalDependencyTest extends TestCase {
 		return inputs;
 	}
 
+	@BeforeClass
+	public static void build(){
+		if(!Files.isDirectory(outTest))
+			try {
+				Files.createDirectories(outTest);
+			} catch (IOException e) {
+				String msg = String.format(
+						"Cannot create one or more test output file/s%n    %s",
+						e.getMessage());
+				fail(msg);
+			}
+	}
+	
 	@AfterClass
 	public static void clean() {
-		Path p = Paths.get(PipelineProcess.getDefaultOutput());
 		DeleteVisitor visitor = new DeleteVisitor();
 		try {
-			Files.walkFileTree(p, visitor);
+			Files.walkFileTree(outTest, visitor);
 		} catch (IOException e) {
 			String msg = String.format(
 					"Cannot delete one or more test output file/s%n    %s",
@@ -87,16 +106,19 @@ public class ExternalDependencyTest extends TestCase {
 		String processName = "usearch";
 		try {
 			PipelineProcess otu = new ClusteringOTU().setInputFiles(inputs);
+			otu.setMainOutputDir(outTest.toString());
 			processName = otu.getProcessType().toString();
 			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
 					otu.launch().getRes());
 			PipelineProcess map = new MappingProcess().setInputFiles(otu
 					.getOutputFiles());
+			map.setMainOutputDir(outTest.toString());
 			processName = map.getProcessType().toString();
 			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
 					map.launch().getRes());
 			PipelineProcess tab = new TableProcess().setInputFiles(map
 					.getOutputFiles());
+			tab.setMainOutputDir(outTest.toString());
 			processName = tab.getProcessType().toString();
 			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
 					tab.launch().getRes());

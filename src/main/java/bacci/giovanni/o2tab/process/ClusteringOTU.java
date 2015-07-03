@@ -3,7 +3,6 @@ package bacci.giovanni.o2tab.process;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
@@ -26,11 +25,6 @@ import bacci.giovanni.o2tab.pipeline.ProcessType;
  *
  */
 public class ClusteringOTU extends PipelineProcess {
-
-	/**
-	 * Sub directory for output files
-	 */
-	private static final String SUBDIR = "clustered";
 
 	/**
 	 * Name of the main output file
@@ -133,9 +127,7 @@ public class ClusteringOTU extends PipelineProcess {
 	 *             if an I/O error occurs creating the output
 	 */
 	private String[] getOutput() throws IOException {
-		Path p = Paths.get(super.getOutputDir()).resolve(SUBDIR);
-		if (!Files.isDirectory(p))
-			Files.createDirectories(p);
+		Path p = Paths.get(super.getOutputDir());
 		String mainOut = p.resolve(NAME).toString();
 		String upOut = p.resolve(NAME_UP).toString();
 		String logOut = p.resolve(NAME_LOG).toString();
