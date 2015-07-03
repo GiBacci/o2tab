@@ -1,7 +1,12 @@
 package bacci.giovanni.o2tab.pipeline;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -16,10 +21,12 @@ import bacci.giovanni.o2tab.process.CallableProcess;
  */
 public abstract class PipelineProcessQueue implements Runnable {
 
+	private static final String OUT_FOLDER = "o2tab_output";
+	
 	/**
 	 * Process list
 	 */
-	protected List<PipelineProcess> processList;
+	protected Set<PipelineProcess> processList;
 
 	/**
 	 * The main output directory
@@ -40,7 +47,7 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 *            the logger
 	 */
 	public PipelineProcessQueue(int queueSize, Logger logger) {
-		this.processList = new ArrayList<PipelineProcess>(queueSize);
+		this.processList = new LinkedHashSet<PipelineProcess>(queueSize);
 		this.logger = logger;
 	}
 
@@ -80,10 +87,9 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 *            th process
 	 */
 	public void addPipelineProcess(PipelineProcess process) {
-		if(outputDir != null)
-			process.setOutputDir(outputDir);
-		if (processList.indexOf(process) < 0)
-			processList.add(process);
+		if (outputDir != null)
+			process.setMainOutputDir(outputDir);
+		processList.add(process);
 	}
 
 	/**
@@ -93,7 +99,7 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 *            the process
 	 */
 	public void removePipelineProcess(CallableProcess process) {
-		if (processList.indexOf(process) >= 0)
+		if (processList.contains(process))
 			processList.remove(process);
 	}
 
@@ -110,9 +116,19 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 * 
 	 * @param outputDir
 	 *            the output directory
+	 * @throws IOException 
 	 */
-	public void setMainOutputDir(String outputDir) {
-		this.outputDir = outputDir;
+	public void setMainOutputDir(String outputDir) throws IOException {
+		Path o = Paths.get(outputDir).resolve(OUT_FOLDER);
+		if (!Files.isDirectory(o.getParent())) {
+			throw new FileNotFoundException("Cannot find output folder: "
+					+ outputDir);
+		} else {
+			if (!Files.isDirectory(o)) {
+				Files.createDirectory(o);
+			}
+		}
+		this.outputDir = o.toString();
 	}
 
 	/**

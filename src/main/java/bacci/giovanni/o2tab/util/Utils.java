@@ -93,5 +93,5 @@ public class Utils {
 			return sequence.substring(0, max);
 		return sequence;
 	}
-	
+
 }

@@ -3,18 +3,21 @@ package bacci.giovanni.o2tab.process;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 import bacci.giovanni.o2tab.util.QualityEncoding;
 
@@ -26,11 +29,6 @@ import bacci.giovanni.o2tab.util.QualityEncoding;
  *
  */
 public class PANDAseqProcessBuilder extends PipelineProcess {
-
-	/**
-	 * The output directory
-	 */
-	private final static String SUBDIR = "assembled";
 
 	/**
 	 * The output file suffix
@@ -64,6 +62,16 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	private String mate2;
 
 	/**
+	 * List of warnings
+	 */
+	private List<String> warnings;
+
+	/**
+	 * List of warnings
+	 */
+	private List<String> errors;
+
+	/**
 	 * Constuctor
 	 * 
 	 * @param mate1
@@ -72,11 +80,13 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	 *            the reverse file token
 	 */
 	public PANDAseqProcessBuilder(String mate1, String mate2) {
-		super(ProcessType.ASSEMBLY);
+		super(ProcessType.ASSEMBLY, "assembled");
 		if (mate1 == null || mate2 == null)
 			throw new NullPointerException();
 		this.mate1 = mate1;
 		this.mate2 = mate2;
+		this.warnings = new ArrayList<String>();
+		this.errors = new ArrayList<String>();
 	}
 
 	/**
@@ -105,51 +115,61 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
-		List<Path> forward = new ArrayList<Path>();
-		List<Path> reverse = new ArrayList<Path>();
-
-		for (String s : getInputFiles()) {
-			if (s.contains(mate1))
-				forward.add(Paths.get(s));
-			if (s.contains(mate2))
-				reverse.add(Paths.get(s));
-		}
-
-		if (forward.size() != reverse.size())
-			throw new IOException("Mate pairs differ in number");
-
-		Collections.sort(forward);
-		Collections.sort(reverse);
-
+	public ProcessResult launch() throws IOException {
 		List<PANDAseqProcess> processList = new ArrayList<PANDAseqProcess>();
+		List<File> errorFiles = new ArrayList<File>();
 
-		for (int i = 0; i < forward.size(); i++) {
-			String out = getOutputPath(forward.get(i).getFileName().toString());
-			PANDAseqProcess panda = new PANDAseqProcess(forward.get(i)
-					.toString(), reverse.get(i).toString(), enc);
+		for (Entry<Path, Path> p : this.pairFiles().entrySet()) {
+			String out = formatOutputFile(p.getKey().getFileName().toString());
+			PANDAseqProcess panda = new PANDAseqProcess(p.getKey().toString(),
+					p.getValue().toString(), enc);
 			panda.setOutput(Redirect.to(new File(out)));
-			panda.setError(Redirect.to(new File(out + ".log")));
+			File error = new File(out + ".log");
+			panda.setError(Redirect.to(error));
 			processList.add(CONFIG.setExternalArguments(panda));
 		}
 
 		ExecutorService ex = Executors.newFixedThreadPool(numThread);
+
+		ProcessResult pr = null;
+
 		try {
 			List<Future<Integer>> results = ex.invokeAll(processList);
-			for (Future<Integer> res : results) {
+			for (int i = 0; i < results.size(); i++) {
+				Future<Integer> res = results.get(i);
 				if (res.get() != 0) {
-					ex.shutdownNow();
-					return PipelineResult.FAILED;
+					this.errors
+							.add("see " + errorFiles.get(i) + " for details");
 				}
 			}
 		} catch (ExecutionException e) {
 			throw new IOException(e.getMessage());
 		} catch (InterruptedException e) {
 			ex.shutdownNow();
-			return PipelineResult.INTERRUPTED;
+			pr = new ProcessResult(PipelineResult.INTERRUPTED);
+			return pr;
 		}
 		ex.shutdown();
-		return PipelineResult.PASSED;
+
+		if (errors.size() == processList.size()) {
+			if (!warnings.isEmpty()) {
+				pr = new ProcessResult(PipelineResult.FAILED_WITH_WARNINGS);
+				pr.addAllWarnings(warnings);
+			} else {
+				pr = new ProcessResult(PipelineResult.FAILED);
+			}
+			pr.addAllFails(errors);
+		} else {
+			if (!warnings.isEmpty() || !errors.isEmpty()) {
+				warnings.addAll(errors);
+				pr = new ProcessResult(PipelineResult.PASSED_WITH_WARNINGS);
+				pr.addAllWarnings(warnings);
+			} else {
+				pr = new ProcessResult(PipelineResult.PASSED);
+			}
+
+		}
+		return pr;
 	}
 
 	/**
@@ -161,13 +181,61 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	 * @throws IOException
 	 *             if an I/O error occurs
 	 */
-	private String getOutputPath(String fileName) throws IOException {
-		Path o = Paths.get(super.getOutputDir());
-		Path out = o.resolve(SUBDIR).resolve(fileName + OUTSUFFIX);
-		if (!Files.isDirectory(out.getParent()))
-			Files.createDirectories(out.getParent());
+	private String formatOutputFile(String fileName) throws IOException {
+		Path out = Paths.get(super.getOutputDir())
+				.resolve(fileName + OUTSUFFIX);
 		super.addOuptuFile(out.toString());
 		return out.toString();
+	}
+
+	/**
+	 * @return a {@link LinkedHashMap} with forward read files as keys and
+	 *         reverse res files as values.
+	 */
+	private Map<Path, Path> pairFiles() {
+		List<Path> forward = new ArrayList<Path>();
+		List<Path> reverse = new ArrayList<Path>();
+
+		String cleanToken = "clean";
+
+		for (String s : getInputFiles()) {
+			Path p = Paths.get(s);
+			if (p.getFileName().toString().contains(mate1))
+				forward.add(p);
+			if (p.getFileName().toString().contains(mate2))
+				reverse.add(p);
+		}
+
+		Map<Path, Path> mateMap = new LinkedHashMap<Path, Path>();
+
+		for (Path p : forward) {
+			String clean = p.getFileName().toString()
+					.replaceAll(mate1, cleanToken);
+			Path val = null;
+			for (Path pp : reverse) {
+				if (clean.equals(pp.getFileName().toString()
+						.replaceAll(mate2, cleanToken)))
+					val = pp;
+			}
+			if (val != null) {
+				mateMap.put(p, val);
+				reverse.remove(val);
+			}
+		}
+
+		List<Path> unpaired = new ArrayList<Path>();
+
+		for (Path p : mateMap.keySet())
+			forward.remove(p);
+
+		unpaired.addAll(forward);
+		unpaired.addAll(reverse);
+
+		for (Path p : unpaired)
+			warnings.add("did not found any mate for " + "the file: "
+					+ p.toString());
+
+		return mateMap;
 	}
 
 	/**

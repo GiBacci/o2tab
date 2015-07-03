@@ -21,7 +21,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.BlockJUnit4ClassRunner;
 
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
-import bacci.giovanni.o2tab.pipeline.PipelineProcess.PipelineResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.process.ClusteringOTU;
 import bacci.giovanni.o2tab.process.MappingProcess;
 import bacci.giovanni.o2tab.process.PANDAseqProcessBuilder;
@@ -36,9 +37,9 @@ public class ExternalDependencyTest extends TestCase {
 		assertEquals(2, inputs.size());
 		PipelineProcess panda = null;
 		try {
-			panda = new PANDAseqProcessBuilder("_1", "_2").setInputFile(inputs);
-			PipelineResult out = panda.launch();
-			assertEquals(PipelineResult.PASSED, out);
+			panda = new PANDAseqProcessBuilder("_1", "_2").setInputFiles(inputs);
+			ProcessResult out = panda.launch();
+			assertEquals(PipelineResult.PASSED, out.getRes());
 		} catch (FileNotFoundException e) {
 			fail("Test files not found");
 		} catch (Exception e) {
@@ -85,20 +86,20 @@ public class ExternalDependencyTest extends TestCase {
 		Collections.sort(inputs);
 		String processName = "usearch";
 		try {
-			PipelineProcess otu = new ClusteringOTU().setInputFile(inputs);
+			PipelineProcess otu = new ClusteringOTU().setInputFiles(inputs);
 			processName = otu.getProcessType().toString();
 			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
-					otu.launch());
-			PipelineProcess map = new MappingProcess().setInputFile(otu
+					otu.launch().getRes());
+			PipelineProcess map = new MappingProcess().setInputFiles(otu
 					.getOutputFiles());
 			processName = map.getProcessType().toString();
 			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
-					map.launch());
-			PipelineProcess tab = new TableProcess().setInputFile(map
+					map.launch().getRes());
+			PipelineProcess tab = new TableProcess().setInputFiles(map
 					.getOutputFiles());
 			processName = tab.getProcessType().toString();
 			assertEquals(formatFailMessage(processName), PipelineResult.PASSED,
-					tab.launch());
+					tab.launch().getRes());
 		} catch (FileNotFoundException e) {
 			fail("Test files not found");
 		} catch (IOException e) {

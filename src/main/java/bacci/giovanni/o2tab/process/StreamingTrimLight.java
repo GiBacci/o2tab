@@ -9,9 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -31,16 +31,13 @@ import org.biojava.bio.program.fastq.SolexaFastqWriter;
 import org.biojava.bio.program.fastq.StreamListener;
 
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.util.ExceptionHandler;
 import bacci.giovanni.o2tab.util.QualityEncoding;
 
 public class StreamingTrimLight extends PipelineProcess {
-
-	/**
-	 * The subdir of the process
-	 */
-	private static final String SUBDIR = "trimmed";
 
 	/**
 	 * The cutoff
@@ -67,11 +64,14 @@ public class StreamingTrimLight extends PipelineProcess {
 	 */
 	private FastqWriter writer = new SangerFastqWriter();
 
+	private List<String> warnings;
+
 	/**
 	 * Constructor
 	 */
 	public StreamingTrimLight() {
-		super(ProcessType.TRIMMING);
+		super(ProcessType.TRIMMING, "trimmed");
+		this.warnings = new ArrayList<String>();
 	}
 
 	/**
@@ -120,11 +120,8 @@ public class StreamingTrimLight extends PipelineProcess {
 	 */
 	private OutputStream createOutptuStream(String file, boolean gzipped)
 			throws IOException {
-		Path o = Paths.get(super.getOutputDir()).resolve(SUBDIR);
-		if (!Files.isDirectory(o))
-			Files.createDirectories(o);
 		String in = Paths.get(file).getFileName().toString();
-		String out = o.resolve(in).toString();
+		String out = Paths.get(super.getOutputDir()).resolve(in).toString();
 		super.addOuptuFile(out);
 
 		OutputStream os = null;
@@ -154,21 +151,35 @@ public class StreamingTrimLight extends PipelineProcess {
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
+	public ProcessResult launch() throws IOException {
 		ExecutorService ex = Executors.newFixedThreadPool(thread);
 		this.handler = new ExceptionHandler<IOException>(ex);
 		for (String input : super.getInputFiles()) {
 			ex.submit(new Trimmer(input));
 		}
+		
 		ex.shutdown();
+		ProcessResult res = null;
+		
 		try {
 			ex.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
 		} catch (InterruptedException e) {
 			ex.shutdownNow();
-			return PipelineResult.INTERRUPTED;
+			res = new ProcessResult(PipelineResult.INTERRUPTED);
+			return res;
 		}
+		
 		this.handler.throwIfAny();
-		return PipelineResult.PASSED;
+
+		if (warnings.size() == super.getInputFiles().size()) {
+			res = new ProcessResult(PipelineResult.FAILED);
+			res.addFail("all sequences were deleted");
+		} else if (!warnings.isEmpty()) {
+			res = new ProcessResult(PipelineResult.PASSED_WITH_WARNINGS);
+		} else {
+			res = new ProcessResult(PipelineResult.PASSED);
+		}
+		return res;
 	}
 
 	/**
@@ -222,8 +233,12 @@ public class StreamingTrimLight extends PipelineProcess {
 				is.close();
 				InputStreamReader isr = createInputStream(input, gzipped);
 				OutputStream out = createOutptuStream(input, gzipped);
-				reader.stream(isr, new QualityListener(out));
+				QualityListener qlist = new QualityListener(out);
+				reader.stream(isr, qlist);
 				out.close();
+				if (qlist.notEmptySequences == 0) {
+					warnings.add("no sequences were written for " + input);
+				}
 			} catch (FileNotFoundException e) {
 				handler.sendException(e);
 			} catch (IOException e) {
@@ -247,6 +262,11 @@ public class StreamingTrimLight extends PipelineProcess {
 		 * Output file
 		 */
 		private OutputStream out;
+
+		/**
+		 * Number of not empty sequences
+		 */
+		private long notEmptySequences = 0;
 
 		/**
 		 * Constructor
@@ -279,6 +299,9 @@ public class StreamingTrimLight extends PipelineProcess {
 			String s = fastq.getSequence().substring(0, cutIndex);
 			String fq = fastq.getQuality().substring(0, cutIndex);
 			String id = fastq.getDescription();
+
+			if (!s.isEmpty())
+				notEmptySequences++;
 
 			Fastq f = new FastqBuilder().withSequence(s).withQuality(fq)
 					.withDescription(id).build();

@@ -13,6 +13,8 @@ import java.util.concurrent.Future;
 
 import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 
 /**
@@ -60,14 +62,19 @@ public class ClusteringOTU extends PipelineProcess {
 	 * Constructor
 	 */
 	public ClusteringOTU() {
-		super(ProcessType.OTUCLUST);
+		super(ProcessType.OTUCLUST, "clustered");
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
-		if (super.getInputFiles().size() != 2)
+	public ProcessResult launch() throws IOException {
+		String warn = null;
+		if (super.getInputFiles().size() < 2)
 			throw new WrongInputFileNumberException(2, super.getInputFiles()
 					.size());
+
+		if (super.getInputFiles().size() > 2)
+			warn = "too many input files found, only the first "
+					+ "two elements will be included in the analysis";
 
 		String input = super.getInputFiles().get(0);
 		String[] outputs = this.getOutput();
@@ -80,25 +87,43 @@ public class ClusteringOTU extends PipelineProcess {
 		clusteringProcess.addArgumentCommand("-otus", outputs[0]);
 		clusteringProcess.addArgumentCommand("-uparseout", outputs[1]);
 		clusteringProcess.addArgumentCommand("-relabel", LABEL);
-		clusteringProcess.setError(Redirect.to(new File(outputs[2])));
+
+		File error = new File(outputs[2]);
+		clusteringProcess.setError(Redirect.to(error));
 
 		ExecutorService ex = Executors.newFixedThreadPool(1);
 
 		Future<Integer> res = ex.submit(CONFIG
 				.setExternalArguments(clusteringProcess));
 
+		ProcessResult pr = null;
 		try {
-			if (res.get() == 0) {
-				return PipelineResult.PASSED;
-			} else {
-				return PipelineResult.FAILED;
+			switch (res.get()) {
+			case 0:
+				if (warn == null) {
+					pr = new ProcessResult(PipelineResult.PASSED);
+				} else {
+					pr = new ProcessResult(PipelineResult.PASSED_WITH_WARNINGS);
+					pr.addWarning(warn);
+				}
+				break;
+			default:
+				if (warn == null) {
+					pr = new ProcessResult(PipelineResult.FAILED);
+				} else {
+					pr = new ProcessResult(PipelineResult.FAILED_WITH_WARNINGS);
+					pr.addWarning(warn);
+				}
+				pr.addFail("see " + error.toString() + " for details");
+				break;
 			}
+		} catch (InterruptedException e) {
+			ex.shutdownNow();
+			pr = new ProcessResult(PipelineResult.INTERRUPTED);
 		} catch (ExecutionException e) {
 			throw new IOException(e.getMessage());
-		} catch (InterruptedException e){
-			ex.shutdownNow();
-			return PipelineResult.INTERRUPTED;
 		}
+		return pr;
 	}
 
 	/**

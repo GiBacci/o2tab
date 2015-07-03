@@ -1,9 +1,13 @@
 package bacci.giovanni.o2tab.pipeline;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Pipeline process
@@ -14,20 +18,23 @@ import java.util.List;
  */
 public abstract class PipelineProcess {
 
+	protected final static String DEFAULT_OUT = Paths
+			.get(System.getProperty("user.dir")).resolve("output").toString();
+
 	/**
 	 * Input file list
 	 */
-	private List<String> inputFiles = null;
+	private Set<String> inputFiles = null;
 
 	/**
 	 * Output file list
 	 */
-	private List<String> outputFiles;
+	private Set<String> outputFiles;
 
 	/**
 	 * Output directory
 	 */
-	private String outputDir;
+	private String mainOutputDir;
 
 	/**
 	 * Name of the process
@@ -35,20 +42,30 @@ public abstract class PipelineProcess {
 	private ProcessType processType;
 
 	/**
+	 * Sub folder for output files
+	 */
+	private String subDir;
+
+	/**
+	 * Process number in the pipeline
+	 */
+	private int processNumber = -1;
+
+	/**
 	 * Constructor
 	 */
-	protected PipelineProcess(ProcessType processType) {
+	protected PipelineProcess(ProcessType processType, String subDir) {
 		this.processType = processType;
-		this.outputFiles = new ArrayList<String>();
-		this.outputDir = PipelineProcess.getDefaultOutput();
+		this.outputFiles = new LinkedHashSet<String>();
+		this.subDir = subDir;
+		this.mainOutputDir = PipelineProcess.getDefaultOutput();
 	}
 
 	/**
 	 * @return the default output path for all processes
 	 */
 	public static String getDefaultOutput() {
-		return Paths.get(System.getProperty("user.dir")).resolve("output")
-				.toString();
+		return Paths.get(System.getProperty("user.dir")).toString();
 	}
 
 	/**
@@ -58,7 +75,19 @@ public abstract class PipelineProcess {
 	 *            the input files
 	 * @return this pipeline process
 	 */
-	public PipelineProcess setInputFile(List<String> inputFiles) {
+	public PipelineProcess setInputFiles(List<String> inputFiles) {
+		this.inputFiles = new LinkedHashSet<String>(inputFiles);
+		return this;
+	}
+
+	/**
+	 * Set the input files and return the pipeline process
+	 * 
+	 * @param inputFiles
+	 *            the input files
+	 * @return this pipeline process
+	 */
+	public PipelineProcess setInputFiles(Set<String> inputFiles) {
 		this.inputFiles = inputFiles;
 		return this;
 	}
@@ -67,7 +96,7 @@ public abstract class PipelineProcess {
 	 * @return the output file list
 	 */
 	public List<String> getOutputFiles() {
-		return outputFiles;
+		return new ArrayList<String>(outputFiles);
 	}
 
 	/**
@@ -76,15 +105,35 @@ public abstract class PipelineProcess {
 	 * @param output
 	 *            the output directory
 	 */
-	protected void setOutputDir(String output) {
-		this.outputDir = output;
+	protected void setMainOutputDir(String output) {
+		this.mainOutputDir = output;
 	}
 
 	/**
 	 * @return the output directory
+	 * @throws IOException
 	 */
-	protected String getOutputDir() {
-		return outputDir;
+	protected String getOutputDir() throws IOException {
+		String folderName = (processNumber > 0) ? String.format("%d.%s",
+				processNumber, subDir) : subDir;
+		Path out = Paths.get(mainOutputDir).resolve(folderName);
+		synchronized (this) {
+			if (!Files.isDirectory(out))
+				Files.createDirectory(out);
+		}
+		return out.toString();
+	}
+
+	/**
+	 * Build method
+	 * 
+	 * @param number
+	 *            the number of this porcess
+	 * @return this prcess with the correct process number
+	 */
+	public PipelineProcess setProcessNumber(int number) {
+		this.processNumber = number;
+		return this;
 	}
 
 	/**
@@ -101,7 +150,7 @@ public abstract class PipelineProcess {
 	 * @return the input files
 	 */
 	protected List<String> getInputFiles() {
-		return inputFiles;
+		return new ArrayList<String>(inputFiles);
 	}
 
 	/**
@@ -122,17 +171,6 @@ public abstract class PipelineProcess {
 	 * @throws InterruptedException
 	 *             if a process has been interrupted
 	 */
-	public abstract PipelineResult launch() throws IOException;
-
-	/**
-	 * Pipeline result tokens
-	 * 
-	 * @author <a href="http://www.unifi.it/dblage/CMpro-v-p-65.html">Giovanni
-	 *         Bacci</a>
-	 *
-	 */
-	public enum PipelineResult {
-		FAILED, PASSED, INTERRUPTED;
-	}
+	public abstract ProcessResult launch() throws IOException;
 
 }

@@ -19,7 +19,7 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	/**
 	 * The result
 	 */
-	private PipelineResult res;
+	private ProcessResult res;
 
 	/**
 	 * A possible IOExcpetion
@@ -38,12 +38,12 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	 *            the process to wrap
 	 */
 	public MonitoredPipelineProcess(PipelineProcess process) {
-		super(process.getProcessType());
+		super(process.getProcessType(), null);
 		this.process = process;
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
+	public ProcessResult launch() throws IOException {
 		Thread t = new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -72,21 +72,39 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 
 		this.checkException();
 
-		switch (res) {
+		this.displayResultMessage(res);
+
+		return res;
+	}
+
+	private void displayResultMessage(ProcessResult res) {
+		switch (res.getRes()) {
 		case PASSED:
-			System.out.println(" process finished correctly");
+			System.out.println("[PASS] process finished correctly");
 			break;
-		case INTERRUPTED:
-			System.out.println(" process interrupted");
+		case PASSED_WITH_WARNINGS:
+			System.out.println("[PASS] process finished with warnings:");
+			for (String w : res.getWarnings())
+				System.out.println(" [WARN] " + w);
 			break;
 		case FAILED:
-			System.out.println(" process fail");
+			System.out.println("[FAIL] process failed: ");
+			for (String e : res.getFails())
+				System.out.println(" [ERROR] " + e);
+			break;
+		case FAILED_WITH_WARNINGS:
+			System.out.println("[FAIL] process failed with warnings: ");
+			for (String e : res.getFails())
+				System.out.println(" [ERROR] " + e);
+			for (String w : res.getWarnings())
+				System.out.println(" [WARN] " + w);
+			break;
+		case INTERRUPTED:
+			System.out.println("[INTERRUPTED] process has been interrupted");
 			break;
 		default:
 			break;
 		}
-		
-		return res;
 	}
 
 	/**

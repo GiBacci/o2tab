@@ -2,11 +2,12 @@ package bacci.giovanni.o2tab.pipeline;
 
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
+import java.nio.file.NoSuchFileException;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import bacci.giovanni.o2tab.pipeline.PipelineProcess.PipelineResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 
 /**
  * This pipeline executes all process in the order they were added. If a process
@@ -37,59 +38,37 @@ public class MandatoryPipeline extends PipelineProcessQueue {
 	@Override
 	public void run() {
 		List<String> inputFiles = null;
-		for (int i = 0; i < super.processList.size(); i++) {
-			boolean first = (i == 0);
-			PipelineProcess pp = super.processList.get(i);
-			PipelineResult res = PipelineResult.FAILED;
+		boolean first = true;
+		for (PipelineProcess pp : super.processList) {
+
+			ProcessResult res = null;
 			if (!first && inputFiles != null)
-				pp.setInputFile(inputFiles);
+				pp.setInputFiles(inputFiles);
 
 			try {
 				res = new MonitoredPipelineProcess(pp).launch();
 			} catch (AccessDeniedException e) {
 				super.log(Level.SEVERE, "Access denied " + e.getMessage());
-				System.exit(-1);
+			} catch (NoSuchFileException e) {
+				super.log(Level.SEVERE,
+						"No file/directoy found: " + e.getMessage());
 			} catch (IOException e) {
 				super.log(Level.SEVERE, e.getMessage());
+			} finally {
 				System.exit(-1);
 			}
-			
-			if(res == PipelineResult.INTERRUPTED)
+
+			if (res.getRes() == PipelineResult.INTERRUPTED)
 				return;
 
-			if (res == PipelineResult.FAILED) {
-				String msg = String.format(
-						"Pipeline process failed%n    name: %s", pp.getClass()
-								.getName());
-				super.log(Level.SEVERE, msg);
-				System.exit(-1);
+			if (res.getRes() == PipelineResult.FAILED
+					|| res.getRes() == PipelineResult.FAILED_WITH_WARNINGS) {
+				return;
 			}
+
+			first = false;
 			inputFiles = pp.getOutputFiles();
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see
-	 * bacci.giovanni.o2tab.pipeline.PipelineProcessQueue#addPipelineProcess
-	 * (bacci.giovanni.o2tab.pipeline.PipelineProcess)
-	 */
-	@Override
-	public void addPipelineProcess(PipelineProcess process) {
-		ProcessType type = process.getProcessType();
-		PipelineProcess subs = null;
-		for (PipelineProcess p : super.processList) {
-			if (p.getProcessType().equals(type)) {
-				subs = p;
-				break;
-			}
-		}
-		if (subs != null) {
-			int index = super.processList.indexOf(subs);
-			super.processList.set(index, process);
-		} else {
-			super.addPipelineProcess(process);
-		}
-	}
 }

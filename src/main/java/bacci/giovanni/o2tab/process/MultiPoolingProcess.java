@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
@@ -21,6 +20,8 @@ import org.biojava.nbio.core.sequence.io.FastaReader;
 import org.biojava.nbio.core.sequence.io.PlainFastaHeaderParser;
 
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 import bacci.giovanni.o2tab.util.ExceptionHandler;
 import bacci.giovanni.o2tab.util.Utils;
@@ -33,11 +34,6 @@ public class MultiPoolingProcess extends PipelineProcess {
 	private static final String BARCODE = ";barcodelabel=";
 
 	/**
-	 * The subdir of the process
-	 */
-	private static final String SUBDIR = "pooled";
-
-	/**
 	 * The name of the output file
 	 */
 	private static final String NAME = "pooled.fasta";
@@ -46,6 +42,11 @@ public class MultiPoolingProcess extends PipelineProcess {
 	 * Pooled sequence writer
 	 */
 	private BufferedWriter writer = null;
+
+	/**
+	 * Number of pooled sequences
+	 */
+	private long pooledSequences = 0;
 
 	/**
 	 * Number of reading threads
@@ -73,11 +74,11 @@ public class MultiPoolingProcess extends PipelineProcess {
 	 * Construcotr
 	 */
 	public MultiPoolingProcess() {
-		super(ProcessType.POOLING);
+		super(ProcessType.POOLING, "pooled");
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
+	public ProcessResult launch() throws IOException {
 		this.writer = createWriter();
 		ExecutorService ex = Executors.newFixedThreadPool(thread);
 		this.handler = new ExceptionHandler<IOException>(ex);
@@ -85,18 +86,26 @@ public class MultiPoolingProcess extends PipelineProcess {
 		for (String file : super.getInputFiles()) {
 			ex.submit(new Pool(file));
 		}
-		
+
+		ProcessResult res = null;
 		ex.shutdown();
 		try {
 			ex.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
 		} catch (InterruptedException e) {
 			ex.shutdownNow();
-			return PipelineResult.INTERRUPTED;
+			res = new ProcessResult(PipelineResult.INTERRUPTED);
+			return res;
 		}
 		this.handler.throwIfAny();
-
 		writer.close();
-		return PipelineResult.PASSED;
+
+		if (pooledSequences > 0) {
+			res = new ProcessResult(PipelineResult.PASSED);
+		} else {
+			res = new ProcessResult(PipelineResult.FAILED);
+			res.addFail("no sequences were pooled");
+		}
+		return res;
 	}
 
 	public MultiPoolingProcess thread(int thread) {
@@ -130,10 +139,7 @@ public class MultiPoolingProcess extends PipelineProcess {
 	 *             if an I/O error occurs
 	 */
 	private BufferedWriter createWriter() throws IOException {
-		Path o = Paths.get(super.getOutputDir()).resolve(SUBDIR);
-		if (!Files.isDirectory(o))
-			Files.createDirectories(o);
-		String out = o.resolve(NAME).toString();
+		String out = Paths.get(super.getOutputDir()).resolve(NAME).toString();
 		super.addOuptuFile(out);
 		FileWriter fw = new FileWriter(out);
 		return new BufferedWriter(fw);
@@ -149,6 +155,7 @@ public class MultiPoolingProcess extends PipelineProcess {
 		writer.write(seq);
 		writer.newLine();
 		writer.flush();
+		pooledSequences++;
 	}
 
 	/**

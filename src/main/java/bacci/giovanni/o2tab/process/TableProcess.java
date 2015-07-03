@@ -3,7 +3,6 @@ package bacci.giovanni.o2tab.process;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
@@ -13,7 +12,9 @@ import java.util.concurrent.Future;
 
 import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 
 /**
  * Otu table generator. This process uses the uc2otutab.py python script.
@@ -23,11 +24,6 @@ import bacci.giovanni.o2tab.pipeline.ProcessType;
  *
  */
 public class TableProcess extends PipelineProcess {
-
-	/**
-	 * Output directory
-	 */
-	private static final String SUBDIR = "table";
 
 	/**
 	 * Output file name
@@ -49,11 +45,11 @@ public class TableProcess extends PipelineProcess {
 	 * Constructor
 	 */
 	public TableProcess() {
-		super(ProcessType.TABLING);
+		super(ProcessType.TABLING, "tabled");
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
+	public ProcessResult launch() throws IOException {
 		if (super.getInputFiles().size() > 1)
 			throw new WrongInputFileNumberException(1, super.getInputFiles()
 					.size());
@@ -63,23 +59,31 @@ public class TableProcess extends PipelineProcess {
 
 		Uc2otutabProcess tab = new Uc2otutabProcess();
 		tab.addSingleCommand(input);
+		
+		File error = new File(outs[1]);
 		tab.setOutput(Redirect.to(new File(outs[0])));
-		tab.setError(Redirect.to(new File(outs[1])));
+		tab.setError(Redirect.to(error));
 
 		ExecutorService ex = Executors.newFixedThreadPool(1);
 		Future<Integer> res = ex.submit(CONFIG.setExternalArguments(tab));
 
+		ProcessResult pr = null;
+		
 		try {
 			if (res.get() == 0) {
-				return PipelineResult.PASSED;
+				pr = new ProcessResult(PipelineResult.PASSED);
+				return pr;
 			} else {
-				return PipelineResult.FAILED;
+				pr = new ProcessResult(PipelineResult.FAILED);
+				pr.addFail("see " + error.toString() + " for details");
+				return pr;
 			}
 		} catch (ExecutionException e) {
 			throw new IOException(e);
 		} catch (InterruptedException e) {
 			ex.shutdownNow();
-			return PipelineResult.INTERRUPTED;
+			pr = new ProcessResult(PipelineResult.INTERRUPTED);
+			return pr;
 		}
 	}
 
@@ -91,13 +95,9 @@ public class TableProcess extends PipelineProcess {
 	 *             directories
 	 */
 	private String[] getOutputs() throws IOException {
-		Path p = Paths.get(super.getOutputDir()).resolve(SUBDIR);
-		if (!Files.isDirectory(p))
-			Files.createDirectories(p);
-
+		Path p = Paths.get(super.getOutputDir());
 		String out = p.resolve(NAME).toString();
 		String log = p.resolve(NAME_LOG).toString();
-
 		return new String[] { out, log };
 
 	}

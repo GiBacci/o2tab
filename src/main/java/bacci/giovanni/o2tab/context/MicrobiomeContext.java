@@ -155,17 +155,18 @@ public class MicrobiomeContext {
 		if (inputs.size() == 0)
 			throw new FileNotFoundException("No file found");
 
+		// Adjusting outputs
+
+		String out = set.has(output) ? set.valueOf(output) : PipelineProcess
+				.getDefaultOutput();
+		queue.setMainOutputDir(out);
+
 		// Log file
 		Path logPath = (set.has(log)) ? Paths.get(set.valueOf(log)) : Paths
-				.get(System.getProperty("user.dir")).resolve("o2tab.log");
+				.get(out).resolve("o2tab.log");
 		FileHandler handler = new FileHandler(logPath.toString());
 		handler.setFormatter(new SimpleFormatter());
 		this.log.addHandler(handler);
-
-		// Adjusting outputs
-		Path o = (set.has(output)) ? Paths.get(set.valueOf(output)) : Paths
-				.get(PipelineProcess.getDefaultOutput());
-		queue.setMainOutputDir(o.toString());
 
 		// Quality encoding
 		QualityEncoding enc = (set.has(enc64)) ? QualityEncoding.PHRED64
@@ -174,12 +175,15 @@ public class MicrobiomeContext {
 		// Thread Number
 		int threadNum = (set.has(thread)) ? set.valueOf(thread) : 1;
 
+		// Pipeline process tuning
+		int processNumber = 1;
+
 		// Trimming
 		boolean trimming = set.has(cutoff);
 		if (trimming) {
 			queue.addPipelineProcess(new StreamingTrimLight()
 					.cutoff(set.valueOf(cutoff)).enc(enc).thread(threadNum)
-					.setInputFile(inputs));
+					.setInputFiles(inputs).setProcessNumber(processNumber++));
 		}
 
 		// Assambly process
@@ -187,12 +191,13 @@ public class MicrobiomeContext {
 		if (assembly) {
 			String mate1 = set.valuesOf(mate).get(0);
 			String mate2 = set.valuesOf(mate).get(1);
-			PANDAseqProcessBuilder panda = new PANDAseqProcessBuilder(mate1,
-					mate2).enc(enc).thread(threadNum);
+			PipelineProcess panda = new PANDAseqProcessBuilder(mate1, mate2)
+					.enc(enc).thread(threadNum)
+					.setProcessNumber(processNumber++);
 			if (trimming) {
 				queue.addPipelineProcess(panda);
 			} else {
-				queue.addPipelineProcess(panda.setInputFile(inputs));
+				queue.addPipelineProcess(panda.setInputFiles(inputs));
 			}
 		}
 
@@ -200,23 +205,27 @@ public class MicrobiomeContext {
 		Integer[] trun = (set.has(truncate)) ? set.valuesOf(truncate).toArray(
 				new Integer[set.valuesOf(truncate).size()]) : new Integer[] {
 				-1, -1 };
-		MultiPoolingProcess pooling = new MultiPoolingProcess().thread(
-				threadNum).truncate(trun[0], trun[1]);
+		PipelineProcess pooling = new MultiPoolingProcess().thread(threadNum)
+				.truncate(trun[0], trun[1]).setProcessNumber(processNumber++);
 
 		if (assembly) {
 			queue.addPipelineProcess(pooling);
 		} else {
-			queue.addPipelineProcess(pooling.setInputFile(inputs));
+			queue.addPipelineProcess(pooling.setInputFiles(inputs));
 		}
 
 		// Dereplication process
 		int min = (set.has(minSize)) ? set.valueOf(minSize) : 1;
-		queue.addPipelineProcess(new DereplicationProcess(min));
+		queue.addPipelineProcess(new DereplicationProcess(min)
+				.setProcessNumber(processNumber++));
 
 		// Clustering, mapping and tabling
-		queue.addPipelineProcess(new ClusteringOTU());
-		queue.addPipelineProcess(new MappingProcess());
-		queue.addPipelineProcess(new TableProcess());
+		queue.addPipelineProcess(new ClusteringOTU()
+				.setProcessNumber(processNumber++));
+		queue.addPipelineProcess(new MappingProcess()
+				.setProcessNumber(processNumber++));
+		queue.addPipelineProcess(new TableProcess()
+				.setProcessNumber(processNumber++));
 	}
 
 	/**

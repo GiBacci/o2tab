@@ -3,7 +3,6 @@ package bacci.giovanni.o2tab.process;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
@@ -13,6 +12,8 @@ import java.util.concurrent.Future;
 
 import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 
 /**
@@ -24,11 +25,6 @@ import bacci.giovanni.o2tab.pipeline.ProcessType;
  *
  */
 public class MappingProcess extends PipelineProcess {
-
-	/**
-	 * Output directory
-	 */
-	private static final String SUBDIR = "mapped";
 
 	/**
 	 * Output file name
@@ -44,20 +40,26 @@ public class MappingProcess extends PipelineProcess {
 	 * The config file reader
 	 */
 	private final static ConfigFileReader<GlobalOTUProcess> CONFIG = new ConfigFileReader<GlobalOTUProcess>(
-			"/usearchglobal.config");		
+			"/usearchglobal.config");
 
 	/**
 	 * Constructor
 	 */
 	public MappingProcess() {
-		super(ProcessType.MAPPING);
+		super(ProcessType.MAPPING, "mapped");
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
-		if (super.getInputFiles().size() != 2) 
-			throw new WrongInputFileNumberException(2, super.getInputFiles().size());
-		
+	public ProcessResult launch() throws IOException {
+		String warn = null;
+		if (super.getInputFiles().size() < 2)
+			throw new WrongInputFileNumberException(2, super.getInputFiles()
+					.size());
+
+		if (super.getInputFiles().size() > 2)
+			warn = "too many input files found, only the first two"
+					+ "elements will be included in the analysis";
+
 		String input = super.getInputFiles().get(0);
 		String[] outs = this.getOutputs();
 
@@ -65,23 +67,42 @@ public class MappingProcess extends PipelineProcess {
 				.get(1));
 		otu.addArgumentCommand("-db", input);
 		otu.addArgumentCommand("-uc", outs[0]);
-		otu.setError(Redirect.to(new File(outs[1])));
-		
+
+		File error = new File(outs[1]);
+		otu.setError(Redirect.to(error));
+
 		ExecutorService ex = Executors.newFixedThreadPool(1);
 		Future<Integer> res = ex.submit(CONFIG.setExternalArguments(otu));
 
+		ProcessResult pr = null;
+
 		try {
-			if (res.get() == 0) {
-				return PipelineResult.PASSED;
-			} else {
-				return PipelineResult.FAILED;
+			switch (res.get()) {
+			case 0:
+				if (warn == null) {
+					pr = new ProcessResult(PipelineResult.PASSED);
+				} else {
+					pr = new ProcessResult(PipelineResult.PASSED_WITH_WARNINGS);
+					pr.addWarning(warn);
+				}
+				break;
+			default:
+				if (warn == null) {
+					pr = new ProcessResult(PipelineResult.FAILED);
+				} else {
+					pr = new ProcessResult(PipelineResult.FAILED_WITH_WARNINGS);
+					pr.addWarning(warn);
+				}
+				pr.addFail("see " + error.toString() + " for details");
+				break;
 			}
-		} catch (ExecutionException e) {
-			throw new IOException(e.getMessage());
 		} catch (InterruptedException e) {
 			ex.shutdownNow();
-			return PipelineResult.INTERRUPTED;
+			pr = new ProcessResult(PipelineResult.INTERRUPTED);
+		} catch (ExecutionException e) {
+			throw new IOException(e.getMessage());
 		}
+		return pr;
 	}
 
 	/**
@@ -91,13 +112,9 @@ public class MappingProcess extends PipelineProcess {
 	 *             if an I/O error occurs generating the files
 	 */
 	private String[] getOutputs() throws IOException {
-		Path p = Paths.get(super.getOutputDir()).resolve(SUBDIR);
-		if (!Files.isDirectory(p))
-			Files.createDirectories(p);
-
+		Path p = Paths.get(super.getOutputDir());
 		String out = p.resolve(NAME).toString();
 		String log = p.resolve(NAME_LOG).toString();
-
 		super.addOuptuFile(out);
 		return new String[] { out, log };
 	}

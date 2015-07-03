@@ -4,8 +4,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -20,6 +18,8 @@ import org.biojavax.bio.seq.RichSequenceIterator;
 
 import bacci.giovanni.o2tab.exceptions.WrongInputFileNumberException;
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
+import bacci.giovanni.o2tab.pipeline.ProcessResult;
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.pipeline.ProcessType;
 import bacci.giovanni.o2tab.util.Utils;
 
@@ -49,11 +49,6 @@ public class DereplicationProcess extends PipelineProcess {
 	private Map<ByteSequence, Long> freq;
 
 	/**
-	 * Name of the output folder
-	 */
-	private final static String SUBDIR = "dereplicated";
-
-	/**
 	 * Name of the output file
 	 */
 	private final static String NAME = "dereplicated.fasta";
@@ -71,19 +66,24 @@ public class DereplicationProcess extends PipelineProcess {
 	 *            output
 	 */
 	public DereplicationProcess(long minCount) {
-		super(ProcessType.DEREPLICATION);
+		super(ProcessType.DEREPLICATION, "dereplicated");
 		this.minCount = minCount;
 		this.freq = new HashMap<DereplicationProcess.ByteSequence, Long>();
 	}
 
 	@Override
-	public PipelineResult launch() throws IOException {
-		if (super.getInputFiles().size() > 1)
+	public ProcessResult launch() throws IOException {
+		String warn = null;
+		if (super.getInputFiles().size() < 1)
 			throw new WrongInputFileNumberException(1, super.getInputFiles()
 					.size());
+		if (super.getInputFiles().size() > 1)
+			warn = "too many input files found, only the first "
+					+ "element will be included in the analysis";
 
 		String s = super.getInputFiles().get(0);
 		RichSequenceIterator it = Utils.getSequenceIterator(s);
+
 		try {
 			while (it != null && it.hasNext()) {
 				this.addSequence(it.nextSequence().seqString());
@@ -93,13 +93,35 @@ public class DereplicationProcess extends PipelineProcess {
 		} catch (BioException e) {
 			throw new IOException("Sequence file is not well formatted " + s);
 		}
-		this.dumpResults();
-		// Adding pooled read file to the output. It will be needed by the
-		// mapping process. It is important that this operation is performed
-		// after the execution of the dumpResults method otherwise the reads
-		// file will be the first in the output list
-		super.addOuptuFile(s);
-		return PipelineResult.PASSED;
+
+		ProcessResult res = null;
+
+		switch (freq.size()) {
+		case 0:
+			if (warn == null) {
+				res = new ProcessResult(PipelineResult.FAILED);
+			} else {
+				res = new ProcessResult(PipelineResult.FAILED_WITH_WARNINGS);
+				res.addWarning(warn);
+			}
+			res.addFail("no sequences have been dereplicated");
+			break;
+		default:
+			this.dumpResults();
+			// Adding pooled read file to the output. It will be needed by the
+			// mapping process. It is important that this operation is performed
+			// after the execution of the dumpResults method otherwise the reads
+			// file will be the first in the output list
+			super.addOuptuFile(s);
+			if (warn == null) {
+				res = new ProcessResult(PipelineResult.PASSED);
+			} else {
+				res = new ProcessResult(PipelineResult.PASSED_WITH_WARNINGS);
+				res.addWarning(warn);
+			}
+			break;
+		}
+		return res;
 	}
 
 	/**
@@ -152,10 +174,7 @@ public class DereplicationProcess extends PipelineProcess {
 	 *             if an I/O error occurs
 	 */
 	private BufferedWriter getWriter() throws IOException {
-		Path p = Paths.get(super.getOutputDir()).resolve(SUBDIR);
-		if (!Files.isDirectory(p))
-			Files.createDirectories(p);
-		String out = p.resolve(NAME).toString();
+		String out = Paths.get(super.getOutputDir()).resolve(NAME).toString();
 		super.addOuptuFile(out);
 		FileWriter fw = new FileWriter(out);
 		return new BufferedWriter(fw);
