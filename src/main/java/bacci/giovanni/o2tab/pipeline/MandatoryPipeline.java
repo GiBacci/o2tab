@@ -18,20 +18,25 @@ import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
  *
  */
 public class MandatoryPipeline extends PipelineProcessQueue {
+	
+	public MandatoryPipeline(int queueSize, Logger logger, String output)
+			throws IOException {
+		super(queueSize, logger, output);
+	}
 
-	public MandatoryPipeline() {
+	public MandatoryPipeline() throws IOException {
 		super();
 	}
 
-	public MandatoryPipeline(int queueSize, Logger logger) {
+	public MandatoryPipeline(int queueSize, Logger logger) throws IOException {
 		super(queueSize, logger);
 	}
 
-	public MandatoryPipeline(int queueSize) {
+	public MandatoryPipeline(int queueSize) throws IOException {
 		super(queueSize);
 	}
 
-	public MandatoryPipeline(Logger logger) {
+	public MandatoryPipeline(Logger logger) throws IOException {
 		super(logger);
 	}
 

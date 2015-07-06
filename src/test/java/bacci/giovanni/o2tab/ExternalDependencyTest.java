@@ -22,7 +22,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.BlockJUnit4ClassRunner;
 
 import bacci.giovanni.o2tab.pipeline.PipelineProcess;
-import bacci.giovanni.o2tab.pipeline.PipelineProcessQueue;
 import bacci.giovanni.o2tab.pipeline.ProcessResult;
 import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
 import bacci.giovanni.o2tab.process.ClusteringOTU;
@@ -33,8 +32,8 @@ import bacci.giovanni.o2tab.process.TableProcess;
 @RunWith(BlockJUnit4ClassRunner.class)
 public class ExternalDependencyTest extends TestCase {
 
-	private static Path outTest = Paths.get(PipelineProcess.getDefaultOutput())
-			.resolve(PipelineProcessQueue.OUT_FOLDER);
+	private static Path outTest = Paths.get(System.getProperty("user.dir"))
+			.resolve("test");
 
 	@Test
 	public void testPandaSeq() {
@@ -73,8 +72,8 @@ public class ExternalDependencyTest extends TestCase {
 	}
 
 	@BeforeClass
-	public static void build(){
-		if(!Files.isDirectory(outTest))
+	public static void build() {
+		if (!Files.isDirectory(outTest))
 			try {
 				Files.createDirectories(outTest);
 			} catch (IOException e) {
@@ -84,7 +83,7 @@ public class ExternalDependencyTest extends TestCase {
 				fail(msg);
 			}
 	}
-	
+
 	@AfterClass
 	public static void clean() {
 		DeleteVisitor visitor = new DeleteVisitor();

@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.logging.FileHandler;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
@@ -54,14 +53,13 @@ public class MicrobiomeContext {
 	 *            program arguments
 	 */
 	public MicrobiomeContext(String[] args) {
-		this.queue = new MandatoryPipeline(log);
 		try {
 			this.parseArgs(args);
 		} catch (NoSuchFileException e) {
-			log.log(Level.SEVERE, "File not found " + e.getMessage());
+			log.severe("Cannot find: " + e.getMessage());
 			System.exit(-1);
 		} catch (IOException e) {
-			log.log(Level.SEVERE, e.getMessage());
+			log.severe("I/O error occurs: " + e.getMessage());
 			System.exit(-1);
 		}
 	}
@@ -156,14 +154,15 @@ public class MicrobiomeContext {
 			throw new FileNotFoundException("No file found");
 
 		// Adjusting outputs
-
-		String out = set.has(output) ? set.valueOf(output) : PipelineProcess
-				.getDefaultOutput();
-		queue.setMainOutputDir(out);
+		if (set.has(output)) {
+			this.queue = new MandatoryPipeline(8, this.log, set.valueOf(output));
+		} else {
+			this.queue = new MandatoryPipeline(8, this.log);
+		}
 
 		// Log file
 		Path logPath = (set.has(log)) ? Paths.get(set.valueOf(log)) : Paths
-				.get(out).resolve("o2tab.log");
+				.get(this.queue.getOutputDir()).resolve("o2tab.log");
 		FileHandler handler = new FileHandler(logPath.toString());
 		handler.setFormatter(new SimpleFormatter());
 		this.log.addHandler(handler);

@@ -2,6 +2,8 @@ package bacci.giovanni.o2tab.pipeline;
 
 import java.io.IOException;
 
+import bacci.giovanni.o2tab.pipeline.ProcessResult.PipelineResult;
+
 /**
  * Pipeline process wrapper.
  * 
@@ -62,11 +64,11 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 				System.out.print(formatMsg(WAIT[index++], true));
 				if (index == WAIT.length)
 					index = 0;
-				Thread.sleep(200);
+				Thread.sleep(400);
 			}
-			System.out.print(formatMsg(WAIT[WAIT.length - 1], false));
+			System.out.println(formatMsg(WAIT[0], false));
 		} catch (InterruptedException e) {
-			System.out.println(" process interrupted");
+			res = new ProcessResult(PipelineResult.INTERRUPTED);
 			t.interrupt();
 		}
 
@@ -133,10 +135,10 @@ public class MonitoredPipelineProcess extends PipelineProcess {
 	 */
 	private String formatMsg(String wait, boolean carriage) {
 		if (carriage) {
-			return String.format("%s process started %s\r",
+			return String.format("[INFO] %s process started %s\r",
 					this.process.getProcessType(), wait);
 		} else {
-			return String.format("%s process started %s",
+			return String.format("[INFO] %s process started %s",
 					this.process.getProcessType(), wait);
 		}
 	}

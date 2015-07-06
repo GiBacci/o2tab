@@ -33,7 +33,9 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	/**
 	 * The output file suffix
 	 */
-	private final static String OUTSUFFIX = "_assembled.fasta";
+	private final static String OUTSUFFIX = ".fasta";
+	
+	private final static String OUTPREFIX = "assembled_";
 
 	/**
 	 * The config file reader
@@ -183,7 +185,7 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 	 */
 	private String formatOutputFile(String fileName) throws IOException {
 		Path out = Paths.get(super.getOutputDir())
-				.resolve(fileName + OUTSUFFIX);
+				.resolve(OUTPREFIX + fileName + OUTSUFFIX);
 		super.addOuptuFile(out.toString());
 		return out.toString();
 	}

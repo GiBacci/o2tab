@@ -65,6 +65,8 @@ public class StreamingTrimLight extends PipelineProcess {
 	private FastqWriter writer = new SangerFastqWriter();
 
 	private List<String> warnings;
+	
+	private final static String PREFIX = "trimmed_";
 
 	/**
 	 * Constructor
@@ -120,7 +122,7 @@ public class StreamingTrimLight extends PipelineProcess {
 	 */
 	private OutputStream createOutptuStream(String file, boolean gzipped)
 			throws IOException {
-		String in = Paths.get(file).getFileName().toString();
+		String in = PREFIX + Paths.get(file).getFileName().toString();
 		String out = Paths.get(super.getOutputDir()).resolve(in).toString();
 		super.addOuptuFile(out);
 

@@ -1,8 +1,8 @@
 package bacci.giovanni.o2tab.pipeline;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashSet;
@@ -22,7 +22,7 @@ import bacci.giovanni.o2tab.process.CallableProcess;
 public abstract class PipelineProcessQueue implements Runnable {
 
 	public static final String OUT_FOLDER = "o2tab_output";
-	
+
 	/**
 	 * Process list
 	 */
@@ -31,7 +31,7 @@ public abstract class PipelineProcessQueue implements Runnable {
 	/**
 	 * The main output directory
 	 */
-	private String outputDir = null;
+	private String outputDir;
 
 	/**
 	 * Process logger
@@ -39,16 +39,43 @@ public abstract class PipelineProcessQueue implements Runnable {
 	private Logger logger;
 
 	/**
-	 * Constructs a queue with the specified queue size and the logger
+	 * Constructs a queue with the specified queue size and the logger. The
+	 * output directory here specified will be the folder in which the main
+	 * outputdirectory will be created.
 	 * 
 	 * @param queueSize
 	 *            the initial size of the queue
 	 * @param logger
 	 *            the logger
+	 * @param the
+	 *            output directory
+	 * @throws IOException
+	 *             if an I/O error occurs creating output folder
 	 */
-	public PipelineProcessQueue(int queueSize, Logger logger) {
+	public PipelineProcessQueue(int queueSize, Logger logger, String output)
+			throws IOException {
 		this.processList = new LinkedHashSet<PipelineProcess>(queueSize);
 		this.logger = logger;
+		this.checkOutputFolder(output);
+	}
+
+	/**
+	 * Constructs a queue with the specified queue size and the logger. Output
+	 * files will be saved in the same folder in which the program is started.
+	 * 
+	 * @param queueSize
+	 *            the initial size of the queue
+	 * @param logger
+	 *            the logger
+	 * @throws IOException
+	 *             if an I/O error occurs creating output folder
+	 */
+	public PipelineProcessQueue(int queueSize, Logger logger)
+			throws IOException {
+		this.processList = new LinkedHashSet<PipelineProcess>(queueSize);
+		this.logger = logger;
+		Path out = Paths.get(System.getProperty("user.dir"));
+		this.checkOutputFolder(out.getParent().toString());
 	}
 
 	/**
@@ -57,8 +84,10 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 * 
 	 * @param queueSize
 	 *            the initial size of the queue
+	 * @throws IOException
+	 *             if an I/O error occurs creating output folder
 	 */
-	public PipelineProcessQueue(int queueSize) {
+	public PipelineProcessQueue(int queueSize) throws IOException {
 		this(queueSize, null);
 	}
 
@@ -67,17 +96,38 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 * 
 	 * @param logger
 	 *            the logger
+	 * @throws IOException
+	 *             if an I/O error occurs creating output folder
 	 */
-	public PipelineProcessQueue(Logger logger) {
+	public PipelineProcessQueue(Logger logger) throws IOException {
 		this(16, logger);
 	}
 
 	/**
 	 * Creates a queue with the a queue size of 16 and a <code>null</code>
 	 * logger
+	 * 
+	 * @throws IOException
+	 *             if an I/O error occurs creating output folder
 	 */
-	public PipelineProcessQueue() {
+	public PipelineProcessQueue() throws IOException {
 		this(16, null);
+	}
+
+	/**
+	 * @param output
+	 *            the output directory
+	 * @throws IOException
+	 *             if an I/O error occurs creating the folder
+	 */
+	private void checkOutputFolder(String output) throws IOException {
+		Path p = Paths.get(output);
+		if (!Files.isDirectory(p))
+			throw new NoSuchFileException(p.toString());
+		Path out = p.resolve(OUT_FOLDER);
+		if (!Files.isDirectory(out))
+			Files.createDirectory(out);
+		this.outputDir = out.toString();
 	}
 
 	/**
@@ -87,8 +137,7 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 *            th process
 	 */
 	public void addPipelineProcess(PipelineProcess process) {
-		if (outputDir != null)
-			process.setMainOutputDir(outputDir);
+		process.setMainOutputDir(outputDir);
 		processList.add(process);
 	}
 
@@ -108,27 +157,6 @@ public abstract class PipelineProcessQueue implements Runnable {
 	 */
 	public int processNumber() {
 		return processList.size();
-	}
-
-	/**
-	 * the main output directory for this queue. All the process added to the
-	 * queue will have the same main output directory
-	 * 
-	 * @param outputDir
-	 *            the output directory
-	 * @throws IOException 
-	 */
-	public void setMainOutputDir(String outputDir) throws IOException {
-		Path o = Paths.get(outputDir).resolve(OUT_FOLDER);
-		if (!Files.isDirectory(o.getParent())) {
-			throw new FileNotFoundException("Cannot find output folder: "
-					+ outputDir);
-		} else {
-			if (!Files.isDirectory(o)) {
-				Files.createDirectory(o);
-			}
-		}
-		this.outputDir = o.toString();
 	}
 
 	/**
@@ -161,6 +189,13 @@ public abstract class PipelineProcessQueue implements Runnable {
 					level.getName(), msg, thrown.getClass().getName());
 			System.err.println(error);
 		}
+	}
+
+	/**
+	 * @return the outputDir
+	 */
+	public String getOutputDir() {
+		return outputDir;
 	}
 
 }

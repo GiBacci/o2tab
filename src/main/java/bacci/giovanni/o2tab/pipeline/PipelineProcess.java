@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -58,14 +59,7 @@ public abstract class PipelineProcess {
 		this.processType = processType;
 		this.outputFiles = new LinkedHashSet<String>();
 		this.subDir = subDir;
-		this.mainOutputDir = PipelineProcess.getDefaultOutput();
-	}
-
-	/**
-	 * @return the default output path for all processes
-	 */
-	public static String getDefaultOutput() {
-		return Paths.get(System.getProperty("user.dir")).toString();
+		this.mainOutputDir = System.getProperty("user.dir");
 	}
 
 	/**
@@ -75,20 +69,8 @@ public abstract class PipelineProcess {
 	 *            the input files
 	 * @return this pipeline process
 	 */
-	public PipelineProcess setInputFiles(List<String> inputFiles) {
+	public PipelineProcess setInputFiles(Collection<String> inputFiles) {
 		this.inputFiles = new LinkedHashSet<String>(inputFiles);
-		return this;
-	}
-
-	/**
-	 * Set the input files and return the pipeline process
-	 * 
-	 * @param inputFiles
-	 *            the input files
-	 * @return this pipeline process
-	 */
-	public PipelineProcess setInputFiles(Set<String> inputFiles) {
-		this.inputFiles = inputFiles;
 		return this;
 	}
 
