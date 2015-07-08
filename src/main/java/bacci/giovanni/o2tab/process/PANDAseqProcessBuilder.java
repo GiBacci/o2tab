@@ -127,6 +127,7 @@ public class PANDAseqProcessBuilder extends PipelineProcess {
 					p.getValue().toString(), enc);
 			panda.setOutput(Redirect.to(new File(out)));
 			File error = new File(out + ".log");
+			errorFiles.add(error);
 			panda.setError(Redirect.to(error));
 			processList.add(CONFIG.setExternalArguments(panda));
 		}

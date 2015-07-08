@@ -158,6 +158,8 @@ public abstract class CallableProcess implements Callable<Integer> {
 	public void setMainCmdPath(String mainCmdPath) {
 		this.mainCmdPath = mainCmdPath;
 	}
+	
+	
 
 	/*
 	 * (non-Javadoc)
